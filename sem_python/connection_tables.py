@@ -133,11 +133,21 @@ def Vandermonde2D(N, r, s):
 
 
 def rstoab(r,s):
-    pass
+    Np = len(r)
+    a = np.zeros(Np)
+    for i in range(Np):
+        if s[i] != 1:
+            a[i] = 2*(1 + r[i])/(1 - s[i]) - 1
+        else:
+            a[i] = -1
+    return a, s
 
 
-def Simplex2DP():
-    pass
+def Simplex2DP(a, b, i, j):
+    # Evaluate 2D orthogonal polynomial on simplex at (a,b) of order (id,jd)
+    h1 = JacobiP(a,0,0,id)
+    h2 = JacobiP(b,2*i+1,0,j)
+    return np.sqrt(2.0)*h1*h2*((1 - b)**i)
 
 
 def JacobiP(x, alpha, beta, N):
@@ -169,7 +179,13 @@ def JacobiP(x, alpha, beta, N):
 
 
 def GradJacobiP(x, alpha, beta, N):
-    pass
+    # Derivative of Jacobi polynomial
+    dp = np.zeros(len(x), 1)
+    if N == 0:
+        return dp
+    else:
+        dp = np.sqrt(N*(N + alpha + beta + 1))*JacobiP(x, alpha + 1, beta + 1, N - 1)
+    return dp
 
 
 def GradSimplex2DP(a,b,id,jd):
