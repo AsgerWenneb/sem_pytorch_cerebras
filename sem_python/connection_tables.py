@@ -1,6 +1,7 @@
 ## Methods for grid generation and connection tables.
 ## Assumes standard triangular grid.
 import numpy as np
+from math import gamma
 
 
 def gen_EToV(elemsx, elemsy): # n1 is x-axis, n2 is y-axis
@@ -131,18 +132,88 @@ def Vandermonde2D(N, r, s):
     return V
 
 
+def rstoab(r,s):
+    pass
+
+
 def Simplex2DP():
     pass
 
 
-def rstoab(r,s):
+def JacobiP(x, alpha, beta, N):
+    xp = x # Transformation to right dim
+    dims = xp.shape ## Size(xp)
+    # if dims(2) == 1: xp = xp.T
+
+    PL = np.zeros((N , len(xp)))
+
+    gamma0 = 2**(alpha + beta + 1)/(alpha + beta + 1)*gamma(alpha + 1)*gamma(beta + 1)/gamma(alpha + beta + 1)
+    PL[0, :] = 1.0/np.sqrt(gamma0)
+    if N == 0:
+        return PL.T
+    gamma1 = (alpha + 1)*(beta + 1)/(alpha + beta + 3)*gamma0
+    PL[1, :] = ((alpha + beta + 2)*xp/2 + (alpha - beta)/2)/np.sqrt(gamma1)
+    if N == 1:
+        return PL[N, :].T
+    
+    aold = 2/(2 + alpha + beta)*np.sqrt((alpha + 1)*(beta +1)/(alpha + beta + 3))
+
+    for i in range(0, N-2):
+        h1 = 2*i + alpha + beta
+        anew = 2/(h1 + 2)*np.sqrt( (i+1)*(i+1+alpha+beta)*(i+1+alpha)*(i+1+beta)/(h1+1)/(h1+3) )
+        bnew = -(alpha*alpha - beta*beta)/(h1*(h1 + 2))
+        PL[i+2, :] = ( -aold*PL[i, :] + (xp - bnew)*PL[i+1, :])
+        aold = anew
+
+    return PL[N, :].T
+
+
+def GradJacobiP(x, alpha, beta, N):
     pass
+
+
+def GradSimplex2DP(a,b,id,jd):
+    fa = JacobiP(a,0,0,id)
+    dfa  = GradJacobiP(a,0,0,id)
+    gb = JacobiP(b,2*id+1,0,jd)
+    dgb = GradJacobiP(b,2*id+1,0,jd)
+
+    dmodedr = dfa*gb
+    if id > 0:
+        dmodedr = dmodedr*((0.5*(1-b))**(id))
+
+    dmodeds = dfa*(gb*(0.5*(1+a)))
+    if id > 0:
+        dmodeds = dmodeds*((0.5*(1-b))**(id))
+
+
+def GradVandermonde2D(N, r, s): # Need to fix indexing 0-index
+    V2Dr = np.zeros((len(r), (N+1)*(N+2)/2))
+    V2Ds = np.zeros((len(r), (N+1)*(N+2)/2))
+
+    a,b = rstoab(r,s)
+    sk = 0
+    for i in range(N+1):
+        for j in range(N - i + 1):
+            V2Dr[:, sk], V2Ds[:, sk] = GradSimplex2DP(a, b, i, j)
+            sk += 1
+    return V2Dr, V2Ds
+
+
+def Dmatrices2D(N,r,s,V): 
+    Vr, Vs = GradVandermonde2D(N, r, s)
+    Dr = Vr/V
+    Ds = Vs/V
+    return Dr, Ds
+
 
 
 
 if __name__ == "__main__":
     elemsx = 4
     elemsy = 3
+    P = 1
+    N = elemsx*elemsy*2
     EToV = gen_EToV(elemsx, elemsy)
     EToE = ti_connect2D(elemsx, elemsy)
     print("EToV:\n", EToV)
