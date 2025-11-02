@@ -1,7 +1,7 @@
 ## Methods for grid generation and connection tables.
 ## Assumes standard triangular grid.
 import numpy as np
-from math import gamma
+from polynomials import *
 
 
 def gen_EToV(elemsx, elemsy): # n1 is x-axis, n2 is y-axis
@@ -92,34 +92,39 @@ def algo14(P, N, EToV, EToE):
                 list_of_idx = [Nfaces + Nfaces*(Mpf - 2) + k  for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))] # Param in range is amount of already numbered points
                 C[n, list_of_idx] = [gidx + k for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))]
                 gidx += (Mp - Nfaces - Nfaces*(Mpf - 2))
-    return C
+    return C.astype('int')
 
 
-def global_assembly(C, N, P, x, y, q): # combined algo 15 and 16
+def global_assembly(C, N, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
     Mp =  int((P+1)*(P+2)/2)
-    A = np.zeros((N,N))
-    B = np.zeros(N)
+    A = np.zeros((N*Mp,N*Mp))
+    B = np.zeros(N*Mp,)
 
     r,s = xytors(x,y)
+    print("r in global assembly:", r)
+    print("s in global assembly:", s)
 
     # Compute kij(n) (4.46) - precompute 
-    V = Vandermonde2D(P, r, s)
-    Dr, Ds = Dmatrices2D(N,r,s,V)
+    # V = Vandermonde2D(P, r, s)
+    # Dr, Ds = Dmatrices2D(N,r,s,V)
     rx, sx, ry, sy, J = geometric_factors(x, y, Dr, Ds)
-    M = (V @ V.T).inv() # Mass matrix
-
-    tmp1 = (rx*Dr + sx*Ds).T @ M @ (rx*Dr + sx*Ds)
-    tmp2 = (ry*Dr + sy*Ds).T @ M @ (ry*Dr + sy*Ds)
-    tmp = tmp1 + tmp2
-    
+    M = np.linalg.inv(V @ V.T) # Mass matrix
 
     for n in range(N):
         # Compute kij(n) (4.46) - value
-        kij = J(n)*tmp
-        
+        print("shape rx" , rx.shape)
+        Dx = np.diag(rx[:, n]) @ Dr + np.diag(sx[:, n]) @ Ds
+        Dy = np.diag(ry[:, n]) @ Dr + np.diag(sy[:, n]) @ Ds
+        print("Dx:", Dx)
+        tmp1 = Dx.T @ M @ Dx
+        tmp2 = Dy.T @ M @ Dy
+        tmp = tmp1 + tmp2
+        #print("tmp print", tmp)
+        kij = J.T[n]*tmp
+        #print("kij:", kij)
+        print(np.diag(J[:, n]) @ tmp)
 
-
-        mij = J(n)*M*q(n)
+        mij = np.diag(J[:, n]) @ M*q(n)
         for j in range(Mp):
 
             jj = C[n,j]
@@ -129,10 +134,12 @@ def global_assembly(C, N, P, x, y, q): # combined algo 15 and 16
 
             for i in range(Mp):
                 if C[n,j] >= C[n,i]:
-                    A[C[n,i], C[n,j]] += 0# kij(n)
+                    A[C[n,i], C[n,j]] += kij[i,j]
 
                 ii = C[n,i]
-                B[ii] += 0 # mij(n) * f(xj, yj)
+                print("B shape" , B.shape)
+                print(ii)
+                B[ii] +=  mij[i,j] #* f(xj, yj)
     return A, B
 
 
@@ -160,12 +167,13 @@ def Vandermonde2D(N, r, s):
     sk = 0
     for i in range(N+1):
         for j in range(N - i + 1):
-            print("------------- printing V[:, sk] ------------")
-            print(V[:, sk])
-            temp = Simplex2DP(a, b, i, j)
-            print("------------- printing Simplex2DP output ------------")
-            print(temp.T)
-            V[:, sk] = temp.T
+            # print("------------- printing V[:, sk] ------------")
+            # print(V[:, sk])
+            # print("calling params:", "a:", a, "b:", b, "i:", i, "j:", j)
+            temp = Simplex2DP(a, b, i, j).T
+            # print("------------- printing Simplex2DP output ------------")
+            temp.shape = V[:, sk].shape
+            V[:, sk] = temp
             sk += 1
     return V
 
@@ -181,7 +189,7 @@ def xytors(x,y):
 
 def rstoab(r,s):
     Np = len(r)
-    a = np.zeros(Np)
+    a = np.zeros((Np,))
     for i in range(Np):
         if s[i] != 1:
             a[i] = 2*(1 + r[i])/(1 - s[i]) - 1
@@ -194,50 +202,7 @@ def Simplex2DP(a, b, i, j):
     # Evaluate 2D orthogonal polynomial on simplex at (a,b) of order (id,jd)
     h1 = JacobiP(a, 0, 0, i)
     h2 = JacobiP(b, 2*i+1, 0, j)
-    return np.sqrt(2.0)*h1*h2*((1 - b)**i)
-
-
-def JacobiP(x, alpha, beta, N):
-    xp = x # Transformation to right dim
-    dims = xp.shape ## Size(xp)
-    # if dims(2) == 1: xp = xp.T
-    print("------------- printing xp ------------")
-    print(xp)
-    print(dims)
-    print(len(xp))
-
-    PL = np.zeros((N+1 , len(xp)))
-    print("size of PL:", PL.shape)
-
-    gamma0 = 2**(alpha + beta + 1)/(alpha + beta + 1)*gamma(alpha + 1)*gamma(beta + 1)/gamma(alpha + beta + 1)
-    PL[0, :] = 1.0/np.sqrt(gamma0)
-    if N == 0:
-        return PL.T
-    gamma1 = (alpha + 1)*(beta + 1)/(alpha + beta + 3)*gamma0
-    PL[1, :] = (((alpha + beta + 2)*xp/2 + (alpha - beta)/2)/np.sqrt(gamma1)).T # Transposed to fix dims
-    if N == 1:
-        return PL[N, :].T
-    
-    aold = 2/(2 + alpha + beta)*np.sqrt((alpha + 1)*(beta +1)/(alpha + beta + 3))
-
-    for i in range(0, N-2):
-        h1 = 2*i + alpha + beta
-        anew = 2/(h1 + 2)*np.sqrt( (i+1)*(i+1+alpha+beta)*(i+1+alpha)*(i+1+beta)/(h1+1)/(h1+3) )
-        bnew = -(alpha*alpha - beta*beta)/(h1*(h1 + 2))
-        PL[i+2, :] = ( -aold*PL[i, :] + (xp - bnew)*PL[i+1, :])
-        aold = anew
-
-    return PL[N, :].T
-
-
-def GradJacobiP(x, alpha, beta, N):
-    # Derivative of Jacobi polynomial
-    dp = np.zeros(len(x), 1)
-    if N == 0:
-        return dp
-    else:
-        dp = np.sqrt(N*(N + alpha + beta + 1))*JacobiP(x, alpha + 1, beta + 1, N - 1)
-    return dp
+    return np.sqrt(2.0)*h1.T*h2.T*((1 - b)**i)
 
 
 def GradSimplex2DP(a,b,id,jd): # Check functionality, check ids
@@ -245,14 +210,26 @@ def GradSimplex2DP(a,b,id,jd): # Check functionality, check ids
     dfa  = GradJacobiP(a,0,0,id)
     gb = JacobiP(b,2*id+1,0,jd)
     dgb = GradJacobiP(b,2*id+1,0,jd)
+    # print("Calling params in GradSimplex2DP:")
+    # print("a:", a)
+    # print("b:", b)
+    # print("id:", id)
+    # print("jd:", jd)
 
     dmodedr = dfa*gb
+    # print()
+    # print("Initial dmodedr:", dmodedr)
+    # print(dmodedr.shape)
+    # print("a", a.shape)
+    # print("dfa" , dfa.shape)
+    # print("gb", gb.shape)
     if id > 0:
-        dmodedr = dmodedr*((0.5*(1-b))**(id))
+        dmodedr = dmodedr*((0.5*(1-b))**(id - 1))
 
     dmodeds = dfa*(gb*(0.5*(1+a)))
+
     if id > 0:
-        dmodeds = dmodeds*((0.5*(1-b))**(id))
+        dmodeds = dmodeds*((0.5*(1-b))**(id - 1))
 
     tmp = dgb*(0.5*(1 - b))**id ## Make sure this is an elementwise multiplication
     if id > 0:
@@ -261,35 +238,57 @@ def GradSimplex2DP(a,b,id,jd): # Check functionality, check ids
 
     dmodedr = 2**(id + 0.5)*dmodedr
     dmodeds = 2**(id + 0.5)*dmodeds
+    # print("Final dmodedr:", dmodedr)
+    # print("Final dmodeds:", dmodeds)
     return dmodedr, dmodeds
     
 
 
 def GradVandermonde2D(N, r, s): # Need to fix indexing 0-index
-    V2Dr = np.zeros((len(r), (N+1)*(N+2)/2))
-    V2Ds = np.zeros((len(r), (N+1)*(N+2)/2))
+    Mp = int((N+1)*(N+2)/2)
+    V2Dr = np.zeros((len(r), Mp))
+    V2Ds = np.zeros((len(r), Mp))
 
     a,b = rstoab(r,s)
+    # print("Shapes:")
+    # print(a.shape)
+    # print(b.shape)
     sk = 0
     for i in range(N+1):
         for j in range(N - i + 1):
-            V2Dr[:, sk], V2Ds[:, sk] = GradSimplex2DP(a, b, i, j)
+            # print("------------- printing GradSimplex2DP output ------------")
+            # print("calling params:", "a:", a, "b:", b, "i:", i, "j:", j)
+            # print("Shapes", "a:", a.shape, "b:", b.shape)
+            t1, t2 = GradSimplex2DP(a, b, i, j)
+            # print("t1:", t1)
+            # print("t2:", t2)
+            # print(V2Dr[:, sk].shape)
+            # print(V2Ds[:, sk].shape)
+            # t1.shape = V2Dr[:, sk].shape
+            # t2.shape = V2Ds[:, sk].shape
+            V2Dr[:, sk], V2Ds[:, sk] = t1, t2
+            # print("V2DR" , V2Dr)
+            # print("V2DS" , V2Ds)
             sk += 1
     return V2Dr, V2Ds
 
 
 def Dmatrices2D(N,r,s,V): 
     Vr, Vs = GradVandermonde2D(N, r, s)
-    Dr = Vr/V
-    Ds = Vs/V
+    print("Vr", Vr)
+    print("Vs", Vs)
+    print("V", V)
+    Dr = Vr @ np.linalg.inv(V)
+    Ds = Vs @ np.linalg.inv(V)
+    
     return Dr, Ds
 
 
 def geometric_factors(x, y, Dr, Ds):
-    xr = Dr*x
-    xs = Ds*x
-    yr = Dr*y
-    ys = Ds*y
+    xr = Dr @ x
+    xs = Ds @ x
+    yr = Dr @ y
+    ys = Ds @ y
     J = xr*ys - xs*yr
     rx =  ys/J
     sx = -yr/J
@@ -307,7 +306,7 @@ def Warpfactor(N, rout, Tol=1e-10):
     Nr = len(rout)
     Pmat = np.zeros((N + 1, Nr))
     for i in range(N + 1):
-        Pmat[i, :] = JacobiP(rout, 0, 0, i)
+        Pmat[i, :] = JacobiP(rout, 0, 0, i).T
 
     Lmat = np.linalg.solve(Veq.T, Pmat)
 
@@ -318,44 +317,13 @@ def Warpfactor(N, rout, Tol=1e-10):
     return warp
 
 
-def JacobiGL(alpha, beta, N):
-    x = np.zeros((N+1, 1))
-    if N == 1:
-        x[0] = -1
-        x[1] = 1
-        return x
-    xint, w = JacobiGQ(alpha + 1, beta + 1, N - 2)
-    x[0] = -1
-    x[1:N] = xint
-    x[N] = 1
-    return x
-
 def Vandermonde1D(N, r):
     V1D = np.zeros((len(r), N + 1))
     for j in range(N + 1):
-        V1D[:, j] = JacobiP(r, 0, 0, j)
+        #print(r, 0, 0, j)
+        temp = JacobiP(r, 0, 0, j)
+        V1D[:, j] = temp.T
     return V1D
-
-
-def JacobiGQ(alpha, beta, N): ##  Needs to verify correctness
-    x = np.zeros((N + 1, 1))
-    w = np.zeros((N + 1, 1))
-    if N == 0:
-        x[0] = (alpha - beta)/(alpha + beta + 2)
-        w[0] = 2
-        return x, w
-
-    J = np.zeros((N + 1, N + 1))
-    h1 = 2*np.arange(0, N + 1) + alpha + beta ## Np arrange?????
-    
-    J = np.diag(-1/2*(alpha**2 - beta**2)/(h1 + 2)/h1) + \
-        np.diag(2/(h1[0:N] +2) *np.sqrt( np.arange(1, N +1)*(np.arange(1, N +1) + alpha + beta)* \
-        (np.arange(1, N +1) + alpha)*(np.arange(1, N +1) + beta)/(h1[0:N] +1)/(h1[0:N] +3) ), 1)
-    J = J + J.T
-    V, D = np.linalg.eig(J)
-    x = np.diag(D)
-    w = (V[0,:].T)**2 * 2**(alpha + beta + 1)/(alpha + beta + 1)*gamma(alpha + 1)*gamma(beta + 1)/gamma(alpha + beta + 1)
-    return x, w
 
 
 def Nodes2D(N):
@@ -382,54 +350,112 @@ def Nodes2D(N):
     x = - L2 + L3
     y = (-L2 - L3 + 2*L1)/np.sqrt(3)
 
+    # print("Initial x:", x)
+    # print("Initial y:", y)
+
     blend1 = 4*L2*L3
     blend2 = 4*L1*L3
     blend3 = 4*L1*L2
     warpf1 = Warpfactor(N, L3-L2)
     warpf2 = Warpfactor(N, L1-L3)
     warpf3 = Warpfactor(N, L2-L1)
+    warpf1.shape = blend1.shape
+    warpf2.shape = blend2.shape
+    warpf3.shape = blend3.shape
+    # print("Warpf1:", warpf1)
+    # print("Warpf2:", warpf2)
+
+    # print("blend1:", blend1)
+    # print("blend2:", blend2)
 
     warp1 = blend1*warpf1*(1 + (alpha*L1)**2)
     warp2 = blend2*warpf2*(1 + (alpha*L2)**2)
     warp3 = blend3*warpf3*(1 + (alpha*L3)**2)
+    test = np.multiply(blend1, (1 + (alpha*L1)**2))
+    # print("debug",test)
+    
+    # print("debug 2", np.multiply(test, warpf1))
+    # print( "warp1:", warp1)
+    # print( "warp2:", warp2)
+    # print( "warp3:", warp3)
+    # print("x before warp:", x)
+    # print("y before warp:", y)
 
     x = x + 1*warp1 + np.cos(2*np.pi/3)*warp2 + np.cos(4*np.pi/3)*warp3
     y = y + 0*warp1 + np.sin(2*np.pi/3)*warp2 + np.sin(4*np.pi/3)*warp3
+
+    # print(1*warp1.T)
+
+    # print("x after warp:", x)
+    # print("y after warp:", y)
     return x, y
 
 
 if __name__ == "__main__":
     elemsx = 4
     elemsy = 3
-    P = 1
+    P = 2
     N = elemsx*elemsy*2
     EToV = gen_EToV(elemsx, elemsy)
     EToE = ti_connect2D(elemsx, elemsy)
 
     x,y = Nodes2D(P) # Local coords
     r,s = xytors(x,y)
+
+    # Constants:
+    Nfp = P + 1
+    Nfaces = 3
+    Mp = int((P+1)*(P+2)/2)
+    NODETOL = 1e-12
+
+
+    V = Vandermonde2D(P, r, s)
+    print("Vandermonde", V)
+    Vr, Vs = GradVandermonde2D(P,r,s)
+    print("Vr:", Vr)
+    print("Vs:", Vs)
+
+    Dr, Ds = Dmatrices2D(P, r, s, V)
+    invV = np.linalg.inv(V)
+
+    print("DR:", Dr)
+    print("DS:", Ds)
+
     v1 = EToV[:, 0].T
     v2 = EToV[:, 1].T
     v3 = EToV[:, 2].T
 
     vx,vy = gen_node_coordinates(elemsx, elemsy)
+    print("vx:", vx)
+    print("vy:", vy)
+
 
     # x and y will have size (Mp x N)?
-    x = 0.5*(-(r+s) @ vx[v1] + (1 + r) @ vx[v2] + (1 + s) @ vx[v3]) 
-    y = 0.5*(-(r+s) @ vy[v1] + (1 + r) @ vy[v2] + (1 + s) @ vy[v3])
+    # print(-(r+s))
+    # print(vx[v1])
+    #print(vx)
+    #print(v1)
+    # (-(r+s)).shape = (len(r),)
+    # vx.shape = (len(vx),1)
+
+
+    x = 0.5*(-(r.T+s.T) * vx[v1] + (1 + r.T) * vx[v2] + (1 + s.T) * vx[v3]) 
+    y = 0.5*(-(r.T+s.T) * vy[v1] + (1 + r.T) * vy[v2] + (1 + s.T) * vy[v3])
+    x = x.T
+    y = y.T
 
     tol = 0.2/P**2
-    Mp = len(s)
 
     ## Implement reordering of nodes here
+    # Not done yet
 
+    print("x after mapping:", x)
+    print("y after mapping:", y)
 
-
-
-    print("EToV:\n", EToV)
-    print("EToE:\n", EToE)
-    print("Node coordinates (x):\n", x)
-    print("Node coordinates (y):\n", y)
+    # print("EToV:\n", EToV)
+    # print("EToE:\n", EToE)
+    # print("Node coordinates (x):\n", x)
+    # print("Node coordinates (y):\n", y)
     C = algo14(P, N, EToV, EToE)
     print("Connection table C:\n", C)
     print(C.shape)
@@ -437,7 +463,7 @@ if __name__ == "__main__":
 
     q = lambda n: 1 # Dummy q
 
-    A, B = global_assembly(C, N, P, x, y, q)
+    A, B = global_assembly(C, N, P, x, y, q, V, Dr, Ds)
     print("Global matrix A:\n", A)
     print("Global vector B:\n", B)
 
