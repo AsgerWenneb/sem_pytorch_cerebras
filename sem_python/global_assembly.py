@@ -4,61 +4,65 @@ import numpy as np
 from global_nodes import gen_node_coordinates
 from local_nodes import Nodes2D
 from coordinate_maps import xytors
-from connection_tables import algo14, gen_EToV, ti_connect2D
+from connection_tables import algo14, gen_EToV, ti_connect2D, convert_coords_to_vec
 from vandermonde import Vandermonde2D, GradVandermonde2D
 
 
 
 
-def global_assembly(C, N, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
+def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
     Mp =  int((P+1)*(P+2)/2)
-    A = np.zeros((N*Mp,N*Mp))
-    B = np.zeros(N*Mp,)
+    A = np.zeros((Ne,Ne))
+    B = np.zeros(Ne,)
+    qn = np.zeros(Mp,)
 
-    # Compute kij(n) (4.46) - precompute 
     rx, sx, ry, sy, J = geometric_factors(x, y, Dr, Ds)
     M = np.linalg.inv(V @ V.T) # Mass matrix
 
     for n in range(N):
         # Compute kij(n) (4.46) - value
-        print("shape rx" , rx.shape)
         Dx = np.diag(rx[:, n]) @ Dr + np.diag(sx[:, n]) @ Ds
         Dy = np.diag(ry[:, n]) @ Dr + np.diag(sy[:, n]) @ Ds
-        print("Dx:", Dx)
         tmp1 = Dx.T @ M @ Dx
         tmp2 = Dy.T @ M @ Dy
         tmp = tmp1 + tmp2
 
-        kij = J.T[n]*tmp
-        print(np.diag(J[:, n]) @ tmp)
+        kij = J.T[n]*tmp # same as np.diag(J[:, n]) @ tmp 
 
-        mij = np.diag(J[:, n]) @ M*q(n)
+        mij = (np.diag(J[:, n]) @ M)
         for j in range(Mp):
-
-            jj = C[n,j]
-            # Coordinates of point j
-            # xj = x[jj]
-            # yj = y[jj]
+            # Coordinates of local idx j in N- different from algo due to x/y data structure
+            # Could pass xv and yv and use jj as index.
+            # jj = C[n,j]
+            xj = x[j, n]
+            yj = y[j, n]
+            print("xj:")
+            print(xj)
 
             for i in range(Mp):
                 if C[n,j] >= C[n,i]:
                     A[C[n,i], C[n,j]] += kij[i,j]
 
                 ii = C[n,i]
-                print("B shape" , B.shape)
-                print(ii)
-                B[ii] +=  mij[i,j] #* f(xj, yj)
+                #print("B shape" , B.shape)
+                #print(ii)
+                f = -q(xj, yj)
+                B[ii] +=  mij[i,j]* f
     return A, B
 
 
-def impose_dirichlet_bc(BoundaryNodesidx, A, B):
+def impose_dirichlet_bc(BoundaryNodesidx, A, B, f, xv, yv, boundary_f):
     for bn in BoundaryNodesidx:
-        B += 0 #-f(bx,by)*A[:, bn]
+        xn = xv[bn]
+        yn = yv[bn]
+        B += -f(xn,yn)*A[:, bn]
         A[bn, :] = 0
         A[:, bn] = 0
         A[bn, bn] = 1
     for bn in BoundaryNodesidx:
-        B[bn] = 0 # d(bx, by)
+        xn = xv[bn]
+        yn = yv[bn]
+        B[bn] = boundary_f(xn, yn)
     return A, B
     
 
@@ -113,7 +117,7 @@ if __name__ == "__main__":
     v3 = EToV[:, 2].T
 
     # Global corner node coordinates
-    vx,vy = gen_node_coordinates(elemsx, elemsy)
+    vx,vy = gen_node_coordinates(elemsx, elemsy, -2,4,-2,4)
 
     # Map local into global coordinates
     x = 0.5*(-(r.T+s.T) * vx[v1] + (1 + r.T) * vx[v2] + (1 + s.T) * vx[v3]) 
@@ -126,13 +130,17 @@ if __name__ == "__main__":
     ## Implement reordering of nodes here
     # Not done yet
 
+    C, Ne = algo14(P, N, EToV, EToE) 
+    print("Number of elements:", Ne)
+    print("Connection table C:\n", C)
 
-    C = algo14(P, N, EToV, EToE)
+    xv, yv = convert_coords_to_vec(C, Ne, x, y)
+
 
     # Global assembly params
-    q = lambda n: 1 # Dummy q
+    q = lambda x,y: 1 # Dummy q
 
-    A, B = global_assembly(C, N, P, x, y, q, V, Dr, Ds)
+    A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
     print("Global matrix A:\n", A)
     print("Global vector B:\n", B)
 

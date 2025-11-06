@@ -74,4 +74,16 @@ def algo14(P, N, EToV, EToE):
                 list_of_idx = [Nfaces + Nfaces*(Mpf - 2) + k  for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))] # Param in range is amount of already numbered points
                 C[n, list_of_idx] = [gidx + k for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))]
                 gidx += (Mp - Nfaces - Nfaces*(Mpf - 2))
-    return C.astype('int')
+    return C.astype('int'), gidx
+
+
+def convert_coords_to_vec(C, Ne, x, y): ## Quite inefficient, double work for corner and edge nodes
+    xv = np.zeros(Ne, )
+    yv = np.zeros(Ne, )
+
+    for n in range(C.shape[0]):
+        for i in range(C.shape[1]):
+            idx = C[n, i]
+            xv[idx] = x[i, n]
+            yv[idx] = y[i, n]
+    return xv, yv
