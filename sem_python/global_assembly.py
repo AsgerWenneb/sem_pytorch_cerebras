@@ -4,7 +4,7 @@ import numpy as np
 from global_nodes import gen_node_coordinates
 from local_nodes import Nodes2D
 from coordinate_maps import xytors
-from connection_tables import algo14, gen_EToV, ti_connect2D, convert_coords_to_vec
+from connection_tables import algo14, gen_EToV, ti_connect2D, convert_coords_to_vec, boundary_nodes_from_grid
 from vandermonde import Vandermonde2D, GradVandermonde2D
 
 
@@ -38,8 +38,8 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
             print("Global idx:",C[n,j], "xj:", xj, "yj:", yj)
 
             for i in range(Mp):
-                if C[n,j] >= C[n,i]:
-                    A[C[n,i], C[n,j]] += kij[i,j]
+                #if C[n,j] >= C[n,i]: ## Results in symmetric assembly
+                A[C[n,i], C[n,j]] += kij[i,j]
 
                 ii = C[n,i]
                 #print("B shape" , B.shape)
@@ -87,7 +87,7 @@ def geometric_factors(x, y, Dr, Ds):
 if __name__ == "__main__":
     elemsx = 4
     elemsy = 3
-    P = 2
+    P = 1
     N = elemsx*elemsy*2
     EToV = gen_EToV(elemsx, elemsy)
     EToE = ti_connect2D(elemsx, elemsy)
@@ -119,8 +119,8 @@ if __name__ == "__main__":
     vx,vy = gen_node_coordinates(elemsx, elemsy, -2,4,-2,4)
 
     # Map local into global coordinates
-    x = 0.5*(-(r.T+s.T) * vx[v1] + (1 + r.T) * vx[v2] + (1 + s.T) * vx[v3]) 
-    y = 0.5*(-(r.T+s.T) * vy[v1] + (1 + r.T) * vy[v2] + (1 + s.T) * vy[v3])
+    x = 0.5*(np.outer(-(r.T+s.T) , vx[v1]) + np.outer((1 + r.T) , vx[v2]) + np.outer((1 + s.T) , vx[v3]))
+    y = 0.5*(np.outer(-(r.T+s.T), vy[v1]) + np.outer((1 + r.T) , vy[v2]) + np.outer((1 + s.T) , vy[v3]))
     x = x.T
     y = y.T
 
@@ -149,23 +149,40 @@ if __name__ == "__main__":
     fint = np.setdiff1d(np.arange(0, Mp), np.concatenate([fid1, fid2, fid3]))
     print("Interior nodes indices:", fint)
     Mpf = P + 1
-    print(fid1[1:Mpf-2])
-    print(fid2[1:Mpf-2])
-    print(fid3[Mpf-2:1])
-    print(fid1)
-    print(fid2)
-    print(fid3)
-    Local_reorder = np.concatenate([0, Mpf - 1, Mp - 1, fid1[1:Mpf-2], fid2[1:Mpf-2], fid3[Mpf-2:1], fint]).T
+    # print(fid1[1:Mpf-2])
+    # print(fid2[1:Mpf-2])
+    # print(fid3[Mpf-2:1])
+    # print(fid1)
+    # print(fid2)
+    # print(fid3)
+    #Local_reorder = np.concatenate([0, Mpf - 1, Mp - 1, fid1[1:Mpf-2], fid2[1:Mpf-2], fid3[Mpf-2:1], fint]).T
+    Local_reorder = np.concatenate([np.array([0]), np.array([Mpf - 1]), np.array([Mp - 1]), fid1[1:Mpf-2], fid2[1:Mpf-2], fid3[Mpf-2:1], fint])
+
+    ## Use the reordering:
 
 
 
+    # Vector style x and y
     xv, yv = convert_coords_to_vec(C, Ne, x, y)
-
 
     # Global assembly params
     q = lambda x,y: 1 # Dummy q
+    
 
-    A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
+
+    print("x:", x)
+    print("y:", y)
+    print("Dr =", Dr)
+    print("Ds =", Ds)
+
+    A, B = global_assembly(C, N, Ne, P, x.T, y.T, q, V, Dr, Ds)
+
+    test_bc = lambda x,y: 0
+    b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P)
+    print("Boundary nodes indices:", b_nodes)
+    A, B = impose_dirichlet_bc(b_nodes, A, B, q, xv, yv, test_bc)
+
+
 
     print("Global matrix A:\n", A)
     print("Global vector B:\n", B)

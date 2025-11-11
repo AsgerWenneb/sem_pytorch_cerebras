@@ -40,7 +40,8 @@ def GradJacobiP(x, alpha, beta, N):
     return dp
 
 
-def JacobiGQ(alpha, beta, N): ##  Needs to verify correctness
+def JacobiGQ(alpha, beta, N): ##  Tested against matlab for 1,1,2
+    #print("JacobiGQ called with N =", N, "alpha =", alpha, "beta =", beta)
     x = np.zeros((N + 1,))
     w = np.zeros((N + 1,))
     if N == 0:
@@ -49,14 +50,15 @@ def JacobiGQ(alpha, beta, N): ##  Needs to verify correctness
         return x, w
 
     J = np.zeros((N + 1, N + 1))
-    h1 = 2*np.arange(0, N + 1) + alpha + beta ## Np arrange?????
+    h1 = 2*np.arange(0, N + 1) + alpha + beta
     
     J = np.diag(-1/2*(alpha**2 - beta**2)/(h1 + 2)/h1) + \
         np.diag(2/(h1[0:N] +2) *np.sqrt( np.arange(1, N +1)*(np.arange(1, N +1) + alpha + beta)* \
         (np.arange(1, N +1) + alpha)*(np.arange(1, N +1) + beta)/(h1[0:N] +1)/(h1[0:N] +3) ), 1)
     J = J + J.T
-    V, D = np.linalg.eig(J)
-    x = np.diag(D)
+    print(J)
+    D, V = np.linalg.eig(J) # D should be the diagonal matrix of eigenvalues (it is not in python, only matlab), V the eigenvectors
+    x = D # Kept this way to reflect original matlab code
     w = (V[0,:].T)**2 * 2**(alpha + beta + 1)/(alpha + beta + 1)*gamma(alpha + 1)*gamma(beta + 1)/gamma(alpha + beta + 1)
     return x, w
 

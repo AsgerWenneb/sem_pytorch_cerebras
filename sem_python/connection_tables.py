@@ -78,16 +78,30 @@ def algo14(P, N, EToV, EToE):
 
 
 def convert_coords_to_vec(C, Ne, x, y): ## Quite inefficient, double work for corner and edge nodes
+    #print("Called with Ne =", Ne, "and C shape", C.shape, "x shape", x.shape, "y shape", y.shape)
     xv = np.zeros(Ne, )
     yv = np.zeros(Ne, )
 
     for n in range(C.shape[0]):
         for i in range(C.shape[1]):
             idx = C[n, i]
-            xv[idx] = x[i, n]
-            yv[idx] = y[i, n]
+            xv[idx] = x[n, i]
+            yv[idx] = y[n, i]
     return xv, yv
 
-def boundary_nodes_from_grid(elemsx, elemsy, P):
-    ## On a given edge, P + 1 nodes is located within the element (corner overlap).
-    pass
+def boundary_nodes_from_grid(elemsx, elemsy, C):
+    idx = 0
+    boundary_nodes = []
+
+    # Add 1st order nodes first:
+    for j in range(elemsy + 1):
+        boundary_nodes.append(j)
+        boundary_nodes.append(j + (elemsy + 1)*elemsx)
+        idx += 2
+    for i in range(1,elemsx):
+        boundary_nodes.append(i*(elemsy + 1))
+        boundary_nodes.append((i+1)*(elemsy + 1) - 1)
+        idx += 2
+
+    return np.array(boundary_nodes).astype('int')
+
