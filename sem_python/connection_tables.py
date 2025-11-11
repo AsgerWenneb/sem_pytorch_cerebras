@@ -87,3 +87,7 @@ def convert_coords_to_vec(C, Ne, x, y): ## Quite inefficient, double work for co
             xv[idx] = x[i, n]
             yv[idx] = y[i, n]
     return xv, yv
+
+def boundary_nodes_from_grid(elemsx, elemsy, P):
+    ## On a given edge, P + 1 nodes is located within the element (corner overlap).
+    pass

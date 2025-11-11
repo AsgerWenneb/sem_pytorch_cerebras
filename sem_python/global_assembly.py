@@ -14,7 +14,6 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
     Mp =  int((P+1)*(P+2)/2)
     A = np.zeros((Ne,Ne))
     B = np.zeros(Ne,)
-    qn = np.zeros(Mp,)
 
     rx, sx, ry, sy, J = geometric_factors(x, y, Dr, Ds)
     M = np.linalg.inv(V @ V.T) # Mass matrix
@@ -36,8 +35,7 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
             # jj = C[n,j]
             xj = x[j, n]
             yj = y[j, n]
-            print("xj:")
-            print(xj)
+            print("Global idx:",C[n,j], "xj:", xj, "yj:", yj)
 
             for i in range(Mp):
                 if C[n,j] >= C[n,i]:
@@ -96,6 +94,7 @@ if __name__ == "__main__":
 
     # Local coords
     x,y = Nodes2D(P) 
+    print(x.shape)
     r,s = xytors(x,y)
 
     # Constants:
@@ -125,14 +124,40 @@ if __name__ == "__main__":
     x = x.T
     y = y.T
 
-    tol = 0.2/P**2
 
-    ## Implement reordering of nodes here
-    # Not done yet
 
     C, Ne = algo14(P, N, EToV, EToE) 
     print("Number of elements:", Ne)
     print("Connection table C:\n", C)
+
+    print("r, ", r)
+    print("s, ", s)
+
+    tol = 0.2/P**2
+
+    ## Implement reordering of nodes here
+    # Copied exactly from FEM book
+
+    #% Faces
+    fid1 = np.nonzero( abs(s + 1) < tol)[0]
+    fid2 = np.nonzero( abs(r+s) < tol)[0]
+    fid3 = np.nonzero( abs(r + 1) < tol)[0]
+    # Fids is used to compute outer normals 
+    # Fids = np.concatenate([fid1, fid2, fid3])
+    
+    #% Interior
+    fint = np.setdiff1d(np.arange(0, Mp), np.concatenate([fid1, fid2, fid3]))
+    print("Interior nodes indices:", fint)
+    Mpf = P + 1
+    print(fid1[1:Mpf-2])
+    print(fid2[1:Mpf-2])
+    print(fid3[Mpf-2:1])
+    print(fid1)
+    print(fid2)
+    print(fid3)
+    Local_reorder = np.concatenate([0, Mpf - 1, Mp - 1, fid1[1:Mpf-2], fid2[1:Mpf-2], fid3[Mpf-2:1], fint]).T
+
+
 
     xv, yv = convert_coords_to_vec(C, Ne, x, y)
 
@@ -141,7 +166,7 @@ if __name__ == "__main__":
     q = lambda x,y: 1 # Dummy q
 
     A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
+
     print("Global matrix A:\n", A)
     print("Global vector B:\n", B)
-
 

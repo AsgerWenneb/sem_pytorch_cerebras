@@ -41,8 +41,8 @@ def GradJacobiP(x, alpha, beta, N):
 
 
 def JacobiGQ(alpha, beta, N): ##  Needs to verify correctness
-    x = np.zeros((N + 1, 1))
-    w = np.zeros((N + 1, 1))
+    x = np.zeros((N + 1,))
+    w = np.zeros((N + 1,))
     if N == 0:
         x[0] = (alpha - beta)/(alpha + beta + 2)
         w[0] = 2
@@ -62,7 +62,7 @@ def JacobiGQ(alpha, beta, N): ##  Needs to verify correctness
 
 
 def JacobiGL(alpha, beta, N):
-    x = np.zeros((N+1, 1))
+    x = np.zeros((N+1,))
     if N == 1:
         x[0] = -1
         x[1] = 1
