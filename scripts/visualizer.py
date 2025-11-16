@@ -2,7 +2,8 @@ from os import sys
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib import tri, cm, colors
+from matplotlib import tri
+from matplotlib.cm import ScalarMappable
 
 
 def read_etov(etov_filename):
@@ -24,7 +25,6 @@ def read_xy_data(filename):
 
         line_size = nnodes*8
 
-        # resfile.seek(8)
         xcoords = np.frombuffer(resfile.read(line_size), dtype=np.float64)
         ycoords = np.frombuffer(resfile.read(line_size), dtype=np.float64)
 
@@ -36,23 +36,35 @@ def read_xy_data(filename):
 def main():
     etov = read_etov(sys.argv[1])
     (xcoords, ycoords, u) = read_xy_data(sys.argv[2])
+
+    for i in range(xcoords.size):
+        print(f"({xcoords[i]}, {ycoords[i]}) = {u[i]}")
+
     print("min(u) =", min(u))
     print("max(u) =", max(u))
 
-    lim = max([abs(min(u)), abs(max(u))])
-    norm = colors.Normalize(vmin=-lim, vmax=lim)
-    plot_args = {'norm': norm, 'cmap': cm.seismic}
+    # Old potentially usefull plotting arguments
+    # lim = max([abs(min(u)), abs(max(u))])
+    # norm = colors.Normalize(vmin=-lim, vmax=lim)
+    # plot_args = {'norm': norm, 'cmap': cm.seismic}
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
     tgrid = tri.Triangulation(xcoords, ycoords, triangles=etov)
-    ax.tricontourf(xcoords, ycoords, u, 100,
-                   tgrid.triangles, **plot_args)
+    tpc = ax.tripcolor(tgrid, u, shading='gouraud',
+                       edgecolors='k', linewidths=0.8)
+
+    # Old plotting command
+    # ax.tricontourf(xcoords, ycoords, u, 100,
+    #                tgrid.triangles, **plot_args)
 
     ax.set_xlabel('X-axis', fontweight='bold')
     ax.set_ylabel('Y-axis', fontweight='bold')
 
+    sm = ScalarMappable(norm=tpc.norm, cmap=tpc.cmap)
+    sm.set_array(u)
+    fig.colorbar(sm, ax=ax, label='value')
     plt.gca().set_aspect('equal')
 
     plt.show()
