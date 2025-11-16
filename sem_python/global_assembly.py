@@ -217,7 +217,8 @@ if __name__ == "__main__":
     # Export data
     print(xv)
 
-    export_data_header("output_data.dat", xv, yv)
+    n_corner_nodes = (elemsx + 1) * (elemsy + 1)
+    export_data_header("output_data.dat", n_corner_nodes, xv, yv)
     export_solution("output_data.dat", sol)
 
     export_etov("output_etov.csv", C)

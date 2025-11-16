@@ -19,7 +19,8 @@ def read_etov(etov_filename):
 
 def read_xy_data(filename):
     with open(filename, 'rb') as resfile:
-        nnodes = int.from_bytes(resfile.read(4), "little")
+        nnodes = int.from_bytes(resfile.read(8), "little")
+        ncornernodes = int.from_bytes(resfile.read(8), "little")
 
         line_size = nnodes*8
 
@@ -29,15 +30,12 @@ def read_xy_data(filename):
 
         u = np.frombuffer(resfile.read(line_size), dtype=np.float64)
 
-    return (xcoords[0:20], ycoords[0:20], u[0:20])
+    return (xcoords[0:ncornernodes], ycoords[0:ncornernodes], u[0:ncornernodes])
 
 
 def main():
     etov = read_etov(sys.argv[1])
     (xcoords, ycoords, u) = read_xy_data(sys.argv[2])
-    print("xcoords[0:20] =", xcoords)
-    print("ycoords[0:20] =", ycoords)
-    print("u[0:20] =", u)
     print("min(u) =", min(u))
     print("max(u) =", max(u))
 
