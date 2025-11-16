@@ -1,7 +1,3 @@
-
-import numpy as np
-import struct
-
 def export_etov(output_file, Etov_table):
     with open(output_file, "w") as output:
         for row in Etov_table:
@@ -9,24 +5,20 @@ def export_etov(output_file, Etov_table):
             output.write(line + "\n")
 
 
-def export_data_header(d_file, x , y):
+def export_data_header(d_file, n_corner_nodes, x, y):
     with open(d_file, "wb") as fd:
         n_nodes = len(x)
         # Write n_nodes as a 64-bit float
-        fd.write(struct.pack("d", float(n_nodes)))
+        fd.write(int.to_bytes(n_nodes, length=8,
+                 byteorder='little', signed=True))
 
-        # Write all X coordinates (64-bit floats)
-        for j in range(n_nodes):
-            fd.write(struct.pack("d", x[j]))
+        fd.write(int.to_bytes(n_corner_nodes, length=8,
+                 byteorder='little', signed=True))
 
-        # Write all Y coordinates (64-bit floats)
-        for j in range(n_nodes):
-            fd.write(struct.pack("d", y[j]))
+        fd.write(x.tobytes())
+        fd.write(y.tobytes())
 
 
 def export_solution(d_file, u):
     with open(d_file, "ab") as fd:
-        n_nodes = len(u)
-        # Write all solution values (64-bit floats)
-        for j in range(n_nodes):
-            fd.write(struct.pack("d", u[j]))
+        fd.write(u.tobytes())
