@@ -1,6 +1,7 @@
 import numpy as np
 
-def xytors(x,y):
+
+def xytors(x, y):
     print("x =", x)
     print("y =", y)
     L1 = (np.sqrt(3)*y + 1)/3
@@ -11,7 +12,7 @@ def xytors(x,y):
     return r, s
 
 
-def rstoab(r,s):
+def rstoab(r, s):
     Np = len(r)
     a = np.zeros((Np,))
     for i in range(Np):

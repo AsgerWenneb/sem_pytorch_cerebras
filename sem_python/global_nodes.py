@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def gen_node_coordinates(elemsx, elemsy, min_x=-1, max_x=1, min_y=-1, max_y=1):
     n_nodes_x = elemsx + 1
     n_nodes_y = elemsy + 1
@@ -12,5 +13,3 @@ def gen_node_coordinates(elemsx, elemsy, min_x=-1, max_x=1, min_y=-1, max_y=1):
             x[idx] = min_x + (max_x - min_x) * i / elemsx
             y[idx] = min_y + (max_y - min_y) * j / elemsy
     return x, y
-
-
