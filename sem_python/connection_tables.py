@@ -62,6 +62,7 @@ def algo14(P, N, EToV, EToE):
                     list_of_idx = [Nfaces + (i)*(Mpf-2) + j for j in range(Mpf-2)] # range() should fix conversion to 0 index
                     C[n, list_of_idx] = [gidx + k for k in range(Mpf - 2)] 
                     gidx += (Mpf - 2)
+                    
 
                 else: # Else, the points have been assigned an index, so this index is copied and reversed.
                     kc = EToE[n,i]
@@ -69,11 +70,11 @@ def algo14(P, N, EToV, EToE):
                     list_of_idx = [Nfaces + (i)*(Mpf-2) + j for j in range(Mpf-2)]
                     C[n, list_of_idx] = C[kc, [Nfaces + (i)*(Mpf-2) + Mpf-3 - j for j in range(Mpf-2)]]
 
-            # Internal points
-            if P > 2:
-                list_of_idx = [Nfaces + Nfaces*(Mpf - 2) + k  for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))] # Param in range is amount of already numbered points
-                C[n, list_of_idx] = [gidx + k for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))]
-                gidx += (Mp - Nfaces - Nfaces*(Mpf - 2))
+        # Internal points
+        if P > 2:
+            list_of_idx = [Nfaces + Nfaces*(Mpf - 2) + k  for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))] # Param in range is amount of already numbered points
+            C[n, list_of_idx] = [gidx + k for k in range(Mp - Nfaces - Nfaces*(Mpf - 2))]
+            gidx += (Mp - Nfaces - Nfaces*(Mpf - 2))
     return C.astype('int'), gidx
 
 
@@ -89,19 +90,53 @@ def convert_coords_to_vec(C, Ne, x, y): ## Quite inefficient, double work for co
             yv[idx] = y[n, i]
     return xv, yv
 
-def boundary_nodes_from_grid(elemsx, elemsy, C):
+def boundary_nodes_from_grid(elemsx, elemsy, P, C):
     idx = 0
-    boundary_nodes = []
+    num_bnodes = (2*(elemsy +1) +  2*(elemsx - 1)) + (P-1)*(2*(elemsx + elemsy))  # First order nodes + higher order nodes
+    print(num_bnodes)
+    boundary_nodes = np.zeros([num_bnodes], dtype=int)
 
     # Add 1st order nodes first:
     for j in range(elemsy + 1):
-        boundary_nodes.append(j)
-        boundary_nodes.append(j + (elemsy + 1)*elemsx)
+        boundary_nodes[idx] = j
+        boundary_nodes[idx + 1] = j + (elemsy + 1)*elemsx
         idx += 2
     for i in range(1,elemsx):
-        boundary_nodes.append(i*(elemsy + 1))
-        boundary_nodes.append((i+1)*(elemsy + 1) - 1)
+        boundary_nodes[idx] = i*(elemsy + 1)
+        boundary_nodes[idx + 1] = (i+1)*(elemsy + 1) - 1
         idx += 2
 
-    return np.array(boundary_nodes).astype('int')
+    # Higher order nodes:
+    # Will be located at index 3:(P-1) in C, or offset depending on face id
+    # For y-axis: fid 3.
+    # For x-axis: fid 1.
+    if P > 1:
+        left_boundary_id = range(1, elemsy*2, 2)
+        right_boundary_id = range(2*elemsx*elemsy - elemsy*2, 2*elemsx*elemsy, 2)
+
+        top_boundary_id = range(0, 2*elemsx*elemsy - elemsy*2 + 1, 2*elemsy)
+        bottom_boundary_id = range(elemsy*2 -1, 2*elemsx*elemsy, 2*elemsy)
+
+        # print("Left boundary element IDs:", list(left_boundary_id))
+        # print("Right boundary element IDs:", list(right_boundary_id))
+        # print("Top boundary element IDs:", list(top_boundary_id))
+        # print("Bottom boundary element IDs:", list(bottom_boundary_id))
+
+        for eid in left_boundary_id:
+            for p in range(1, P):
+                boundary_nodes[idx] = C[eid, 2 + p]
+                idx += 1
+        for eid in right_boundary_id:
+            for p in range(1, P):
+                boundary_nodes[idx] = C[eid, 2 + p]
+                idx += 1
+        for eid in top_boundary_id:
+            for p in range(1, P):
+                boundary_nodes[idx] = C[eid, 2 + 2*(P-1) + p]
+                idx += 1
+        for eid in bottom_boundary_id:
+            for p in range(1, P):
+                boundary_nodes[idx] = C[eid, 2 + 2*(P-1) + p]
+                idx += 1
+    return boundary_nodes
 

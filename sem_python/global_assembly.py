@@ -35,7 +35,6 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
             # jj = C[n,j]
             xj = x[j, n]
             yj = y[j, n]
-            print("Global idx:",C[n,j], "xj:", xj, "yj:", yj)
 
             for i in range(Mp):
                 #if C[n,j] >= C[n,i]: ## Results in symmetric assembly
@@ -87,7 +86,7 @@ def geometric_factors(x, y, Dr, Ds):
 if __name__ == "__main__":
     elemsx = 4
     elemsy = 3
-    P = 1
+    P = 3
     N = elemsx*elemsy*2
     EToV = gen_EToV(elemsx, elemsy)
     EToE = ti_connect2D(elemsx, elemsy)
@@ -111,9 +110,9 @@ if __name__ == "__main__":
     invV = np.linalg.inv(V)
 
 
-    v1 = EToV[:, 0].T
-    v2 = EToV[:, 1].T
-    v3 = EToV[:, 2].T
+    v1 = EToV[:, 0]
+    v2 = EToV[:, 1]
+    v3 = EToV[:, 2]
 
     # Global corner node coordinates
     vx,vy = gen_node_coordinates(elemsx, elemsy, -2,4,-2,4)
@@ -130,8 +129,8 @@ if __name__ == "__main__":
     print("Number of elements:", Ne)
     print("Connection table C:\n", C)
 
-    print("r, ", r)
-    print("s, ", s)
+    # print("r, ", r)
+    # print("s, ", s)
 
     tol = 0.2/P**2
 
@@ -147,18 +146,22 @@ if __name__ == "__main__":
     
     #% Interior
     fint = np.setdiff1d(np.arange(0, Mp), np.concatenate([fid1, fid2, fid3]))
-    print("Interior nodes indices:", fint)
+    # print("Interior nodes indices:", fint)
     Mpf = P + 1
-    # print(fid1[1:Mpf-2])
-    # print(fid2[1:Mpf-2])
-    # print(fid3[Mpf-2:1])
+    # print(fid1[1:Mpf-1])
+    # print(fid2[1:Mpf-1])
+    # print(np.flip(fid3[1:Mpf-1]))
     # print(fid1)
     # print(fid2)
     # print(fid3)
-    #Local_reorder = np.concatenate([0, Mpf - 1, Mp - 1, fid1[1:Mpf-2], fid2[1:Mpf-2], fid3[Mpf-2:1], fint]).T
-    Local_reorder = np.concatenate([np.array([0]), np.array([Mpf - 1]), np.array([Mp - 1]), fid1[1:Mpf-2], fid2[1:Mpf-2], fid3[Mpf-2:1], fint])
+    Local_reorder = np.concatenate([np.array([0]), np.array([Mpf - 1]), np.array([Mp - 1]), fid1[1:Mpf-1], fid2[1:Mpf-1], np.flip(fid3[1:Mpf-1]), fint])
 
     ## Use the reordering:
+    x = x[:, Local_reorder]
+    y = y[:, Local_reorder]
+
+    print("reordering:", Local_reorder)
+
 
 
 
@@ -170,15 +173,15 @@ if __name__ == "__main__":
     
 
 
-    print("x:", x)
-    print("y:", y)
+    print("x =", x)
+    print("y =", y)
     print("Dr =", Dr)
     print("Ds =", Ds)
 
     A, B = global_assembly(C, N, Ne, P, x.T, y.T, q, V, Dr, Ds)
 
     test_bc = lambda x,y: 0
-    b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P)
+    b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P, C)
     print("Boundary nodes indices:", b_nodes)
     A, B = impose_dirichlet_bc(b_nodes, A, B, q, xv, yv, test_bc)
 
