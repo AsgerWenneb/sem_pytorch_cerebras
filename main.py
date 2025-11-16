@@ -2,8 +2,6 @@ import cerebras.pytorch as cstorch
 import torch
 from torch.nn import Module
 
-cstorch.backend(backend_type="CSX")
-
 
 class Multigrid(Module):
     def __init__(self, k, omega, A):
@@ -57,15 +55,35 @@ class Jacobi(Module):
         return u
 
 
+def get_torch_dataloader(batch_size, size):
+    return torch.utils.data.DataLoader(
+        torch.TensorDataset(torch.eye(1)), batch_size=batch_size
+    )
+
+
+@cstorch.trace
+def mg_step(model, *inputs):
+    return model(*inputs)
+
+
+@cstorch.step_closure
+def print_step(value: torch.Tensor, step: int):
+    print(f"Train Loss {step}: {value.item()}")
+
+
 def main():
+    backend = cstorch.backend(backend_type="CPU")
+
     omega = 2/3
     A = torch.eye(5)
     b = torch.zeros(5)
     model = Multigrid(1, omega, A)
 
+    compiled_model = cstorch.compile(model, backend=backend)
+
     u = torch.rand(5)
     print("Initial guess", u)
-    u = model(u, b)
+    u = mg_step(compiled_model, u, b)
     print("Estimated solution", u)
 
 

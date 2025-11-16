@@ -1,1 +1,9 @@
 venv/
+model_dir/
+__pycache__/
+data/
+mnist/
+MNIST/
+cerebras_logs/
+executors/
+checkpoint*

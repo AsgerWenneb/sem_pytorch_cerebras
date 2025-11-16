@@ -1,0 +1,40 @@
+# params.yaml  (Trainer YAML)
+trainer:
+  init:
+    backend:
+      backend_type: CSX
+    model_dir: ./model_dir
+    seed: 1
+    model:
+      name: "my_mlp"
+    optimizer:
+      AdamW:
+        betas:
+        - 0.9
+        - 0.95
+        eps: 1.0e-05
+        correct_bias: true
+        weight_decay: 0.1
+  fit:
+    train_dataloader:
+      data_processor: MNISTDataProcessor
+      data_dir: ./mnist
+      batch_size: 4
+      drop_last_batch: true
+      to_float16: true
+      shuffle: true
+      split: train
+      # data_processor: SyntheticDataProcessor
+      # batch_size: 8
+      # synthetic_inputs:
+      #   shape: [1, 2, 3]
+      #   dtype: float16
+      # data_processor: GptHDF5MapDataProcessor
+      # data_dir: ./shuffled/llama_v2_data_test/val
+      # shuffle: false
+      # shuffle_seed: 1
+      # batch_size: 1024
+      # num_workers: 8
+      # prefetch_factor: 10
+      # persistent_workers: true 
+      # … minimal stub is fine for compile-only
