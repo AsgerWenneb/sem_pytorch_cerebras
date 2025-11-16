@@ -6,12 +6,13 @@ from local_nodes import Nodes2D
 from coordinate_maps import xytors
 from connection_tables import algo14, gen_EToV, ti_connect2D, convert_coords_to_vec, boundary_nodes_from_grid
 from vandermonde import Vandermonde2D, GradVandermonde2D
-
+from data_export import export_etov, export_data_header, export_solution
 
 
 
 def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds): # combined algo 15 and 16
-    Mp =  int((P+1)*(P+2)/2)
+    Mp = int((P+1)*(P+2)/2)
+    print("Global assembly called with Ne =", Ne, "and N =", N)
     A = np.zeros((Ne,Ne))
     B = np.zeros(Ne,)
 
@@ -63,7 +64,12 @@ def impose_dirichlet_bc(BoundaryNodesidx, A, B, f, xv, yv, boundary_f):
     return A, B
     
 
-def Dmatrices2D(N,r,s,V): 
+def Dmatrices2D(N,r,s,V):
+    print("Calling params:")
+    print("N = ", N)
+    print("r = ", r)
+    print("s = ", s)
+    print("V = ", V)
     Vr, Vs = GradVandermonde2D(N, r, s)
     Dr = Vr @ np.linalg.inv(V)
     Ds = Vs @ np.linalg.inv(V)    
@@ -71,11 +77,20 @@ def Dmatrices2D(N,r,s,V):
 
 
 def geometric_factors(x, y, Dr, Ds):
+    print("x = ", x)
+    print("y = ", y)
+    print("Dr = ", Dr)
+    print("Ds = ", Ds)
     xr = Dr @ x
     xs = Ds @ x
     yr = Dr @ y
     ys = Ds @ y
+    print("xr =", xr)
+    print("xs =", xs)
+    print("yr =", yr)
+    print("ys =", ys)
     J = xr*ys - xs*yr
+    print("J =", J)
     rx =  ys/J
     sx = -yr/J
     ry = -xs/J
@@ -118,15 +133,16 @@ if __name__ == "__main__":
     vx,vy = gen_node_coordinates(elemsx, elemsy, -2,4,-2,4)
 
     # Map local into global coordinates
-    x = 0.5*(np.outer(-(r.T+s.T) , vx[v1]) + np.outer((1 + r.T) , vx[v2]) + np.outer((1 + s.T) , vx[v3]))
-    y = 0.5*(np.outer(-(r.T+s.T), vy[v1]) + np.outer((1 + r.T) , vy[v2]) + np.outer((1 + s.T) , vy[v3]))
-    x = x.T
-    y = y.T
+    x = 0.5*(np.outer(-(r+s) , vx[v1]) + np.outer((1 + r) , vx[v2]) + np.outer((1 + s) , vx[v3]))
+    y = 0.5*(np.outer(-(r+s), vy[v1]) + np.outer((1 + r) , vy[v2]) + np.outer((1 + s) , vy[v3]))
+
+    x = x
+    y = y
+    print(x)
 
 
-
-    C, Ne = algo14(P, N, EToV, EToE) 
-    print("Number of elements:", Ne)
+    C, Ne = algo14(P, N, EToV, EToE, elemsx, elemsy) 
+    print("Number of unique nodes:", Ne)
     print("Connection table C:\n", C)
 
     # print("r, ", r)
@@ -157,8 +173,8 @@ if __name__ == "__main__":
     Local_reorder = np.concatenate([np.array([0]), np.array([Mpf - 1]), np.array([Mp - 1]), fid1[1:Mpf-1], fid2[1:Mpf-1], np.flip(fid3[1:Mpf-1]), fint])
 
     ## Use the reordering:
-    x = x[:, Local_reorder]
-    y = y[:, Local_reorder]
+    x = x[Local_reorder, :]
+    y = y[Local_reorder, :]
 
     print("reordering:", Local_reorder)
 
@@ -166,10 +182,11 @@ if __name__ == "__main__":
 
 
     # Vector style x and y
-    xv, yv = convert_coords_to_vec(C, Ne, x, y)
+    xv, yv = convert_coords_to_vec(C, Ne, x.T, y.T)
 
     # Global assembly params
-    q = lambda x,y: 1 # Dummy q
+    q = lambda x,y: 0# Dummy q
+    test_bc = lambda x,y: 1
     
 
 
@@ -178,15 +195,30 @@ if __name__ == "__main__":
     print("Dr =", Dr)
     print("Ds =", Ds)
 
-    A, B = global_assembly(C, N, Ne, P, x.T, y.T, q, V, Dr, Ds)
+    A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
 
-    test_bc = lambda x,y: 0
+    
     b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P, C)
     print("Boundary nodes indices:", b_nodes)
     A, B = impose_dirichlet_bc(b_nodes, A, B, q, xv, yv, test_bc)
 
-
-
     print("Global matrix A:\n", A)
     print("Global vector B:\n", B)
 
+    print("Size of A:", A.shape)
+    print("Size of B:", B.shape)
+    
+    sol = np.linalg.solve(A, B)
+
+    print("Solution:", sol)
+    print("Solution max value:", np.max(sol))
+    print("Solution min value:", np.min(sol))
+
+    # Export data
+    print(xv)
+
+    export_data_header("output_data.dat", xv, yv)
+    export_solution("output_data.dat", sol)
+
+    export_etov("output_etov.csv", C)
+    print(xv.dtype)

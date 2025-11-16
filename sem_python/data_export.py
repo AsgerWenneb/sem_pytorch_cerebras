@@ -13,20 +13,10 @@ def export_data_header(d_file, x , y):
     with open(d_file, "wb") as fd:
         n_nodes = len(x)
         # Write n_nodes as a 64-bit float
-        fd.write(struct.pack("d", float(n_nodes)))
-
-        # Write all X coordinates (64-bit floats)
-        for j in range(n_nodes):
-            fd.write(struct.pack("d", x[j]))
-
-        # Write all Y coordinates (64-bit floats)
-        for j in range(n_nodes):
-            fd.write(struct.pack("d", y[j]))
-
+        fd.write(int.to_bytes(n_nodes, length=8, byteorder='little', signed=True))
+        fd.write(x.tobytes())
+        fd.write(y.tobytes())
 
 def export_solution(d_file, u):
     with open(d_file, "ab") as fd:
-        n_nodes = len(u)
-        # Write all solution values (64-bit floats)
-        for j in range(n_nodes):
-            fd.write(struct.pack("d", u[j]))
+        fd.write(u.tobytes())

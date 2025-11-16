@@ -29,13 +29,15 @@ def read_xy_data(filename):
 
         u = np.frombuffer(resfile.read(line_size), dtype=np.float64)
 
-    return (xcoords, ycoords, u)
+    return (xcoords[0:20], ycoords[0:20], u[0:20])
 
 
 def main():
     etov = read_etov(sys.argv[1])
     (xcoords, ycoords, u) = read_xy_data(sys.argv[2])
-
+    print("xcoords[0:20] =", xcoords)
+    print("ycoords[0:20] =", ycoords)
+    print("u[0:20] =", u)
     print("min(u) =", min(u))
     print("max(u) =", max(u))
 

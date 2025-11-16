@@ -41,10 +41,10 @@ def ti_connect2D(elemsx, elemsy): ## EToF is trivial, so not returned
     return EToE
 
 
-def algo14(P, N, EToV, EToE):
+def algo14(P, N, EToV, EToE, elemsx, elemsy):
     ## For starters implemented as in book
 
-    gidx = EToV.shape[0]
+    gidx = (elemsx + 1)*(elemsy + 1)
     Mp = int((P+1)*(P+2)/2)
     Mpf = P + 1
     Nfaces = 3
