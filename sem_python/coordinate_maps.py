@@ -2,8 +2,8 @@ import numpy as np
 
 
 def xytors(x, y):
-    print("x =", x)
-    print("y =", y)
+    # print("x =", x)
+    # print("y =", y)
     L1 = (np.sqrt(3)*y + 1)/3
     L2 = (-3*x - np.sqrt(3)*y + 2)/6
     L3 = (3*x - np.sqrt(3)*y + 2)/6
