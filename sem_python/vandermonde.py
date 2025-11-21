@@ -6,8 +6,6 @@ from polynomials import JacobiP
 
 def Vandermonde2D(N, r, s):
     V = np.zeros((len(r), int((N+1)*(N+2)//2)))
-    print("size of V:", V.shape)
-
     a, b = rstoab(r, s)
 
     sk = 0

@@ -51,8 +51,7 @@ def Nodes2D(N):
     blend1 = 4*L2*L3
     blend2 = 4*L1*L3
     blend3 = 4*L1*L2
-    print("Debugging warpfactor:")
-    print(L3-L2)
+
     warpf1 = Warpfactor(N, L3-L2)
     warpf2 = Warpfactor(N, L1-L3)
     warpf3 = Warpfactor(N, L2-L1)
