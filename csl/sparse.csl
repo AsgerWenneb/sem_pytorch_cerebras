@@ -1,0 +1,5 @@
+const triplet = struct {
+  i: u16,
+  j: u16,
+  x: f32
+};

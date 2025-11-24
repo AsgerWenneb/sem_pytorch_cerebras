@@ -1,40 +1,42 @@
-const layout_mod = @import_module("<layout>");
-
+// Struct containing parameters for memcpy layout
 param memcpy_params: comptime_struct;
+param N_per_PE: u16;
+param NZ_per_N: u16;
 
-// Dimension of square matrix
-param N_per_PE: u32;
+const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const sparse = @import_module("sparse.csl");
 
-param kernel_x_dim: u16;
-param kernel_y_dim: u16;
+// 48 kB of global memory contain A, x, b, y
+var NZ: [1]u32;
+var A: [N_per_PE*NZ_per_N]sparse.triplet; // A is stored column major
+var x: [N_per_PE]f32;
+var y: [N_per_PE]f32;
 
-param east_color: color; // sends/receives partial result east
-param west_color: color; // sends/receives partial result west
-param vert_color: color; // sends/receives result in column
+// ptrs to A, x, b, y will be advertised as symbols to host
+var NZ_ptr: [*]u32 = &NZ;
+var A_ptr: [*]sparse.triplet = &A;
+var x_ptr: [*]f32 = &x;
+var y_ptr: [*]f32 = &y;
 
-fn is_right_of_diagonal() bool {
-	return (layout_mod.get_x_coord() < layout_mod.get_y_coord())
+var triplet: sparse.triplet;
+
+fn compute() void {
+	for (@range(u32, NZ[0])) |i| {
+		triplet = A[i];
+
+		y[triplet.i] += triplet.x * x[triplet.j];
+	}
+
+    sys_mod.unblock_cmd_stream();
 }
 
-fn is_left_of_diagonal() bool {
-	return (layout_mod.get_x_coord() > layout_mod.get_y_coord())
+comptime {
+    // Export symbol pointing to y so it is host-readable
+    @export_symbol(NZ_ptr, "NZ");
+    @export_symbol(A_ptr, "A");
+    @export_symbol(x_ptr, "x");
+    @export_symbol(y_ptr, "y");
+
+    // Export function so it is host-callable by RPC mechanism
+    @export_symbol(compute);
 }
-
-param east_queue_type: type =
-	if (comptime is_left_of_diagonal()) output_queue
-	else 								input_queue;
-
-param west_queue_type: type =
-	if (comptime is_right_of_diagonal()) output_queue
-	else 								 input_queue;
-	
-const east_queue: east_queue_type = 
-	if (comptime is_left_of_diagonal()) @get_output_queue(2);
-	else								@get_input_queue(2);
-
-const west_queue: west_queue_type = 
-	if (comptime is_right_of_diagonal()) @get_output_queue(3);
-	else								 @get_input_queue(3);
-
-const vertical_oq: output_queue = @get_output_queue(4);
-const vertical_iq: input_queue  = @get_input_queue(4);
