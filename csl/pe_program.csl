@@ -1,0 +1,40 @@
+const layout_mod = @import_module("<layout>");
+
+param memcpy_params: comptime_struct;
+
+// Dimension of square matrix
+param N_per_PE: u32;
+
+param kernel_x_dim: u16;
+param kernel_y_dim: u16;
+
+param east_color: color; // sends/receives partial result east
+param west_color: color; // sends/receives partial result west
+param vert_color: color; // sends/receives result in column
+
+fn is_right_of_diagonal() bool {
+	return (layout_mod.get_x_coord() < layout_mod.get_y_coord())
+}
+
+fn is_left_of_diagonal() bool {
+	return (layout_mod.get_x_coord() > layout_mod.get_y_coord())
+}
+
+param east_queue_type: type =
+	if (comptime is_left_of_diagonal()) output_queue
+	else 								input_queue;
+
+param west_queue_type: type =
+	if (comptime is_right_of_diagonal()) output_queue
+	else 								 input_queue;
+	
+const east_queue: east_queue_type = 
+	if (comptime is_left_of_diagonal()) @get_output_queue(2);
+	else								@get_input_queue(2);
+
+const west_queue: west_queue_type = 
+	if (comptime is_right_of_diagonal()) @get_output_queue(3);
+	else								 @get_input_queue(3);
+
+const vertical_oq: output_queue = @get_output_queue(4);
+const vertical_iq: input_queue  = @get_input_queue(4);
