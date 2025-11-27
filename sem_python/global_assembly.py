@@ -8,6 +8,7 @@ from connection_tables import algo14, gen_EToV, ti_connect2D, convert_coords_to_
 from vandermonde import Vandermonde2D, GradVandermonde2D
 from data_export import export_etov, export_data_header, export_solution
 
+import matplotlib.pyplot as plt
 
 def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
     Mp = int((P+1)*(P+2)/2)
@@ -20,15 +21,22 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
 
     for n in range(N):
         # Compute kij(n) (4.46) - value
+        mij = (np.diag(J[:, n]) @ M)
         Dx = np.diag(rx[:, n]) @ Dr + np.diag(sx[:, n]) @ Ds
         Dy = np.diag(ry[:, n]) @ Dr + np.diag(sy[:, n]) @ Ds
-        tmp1 = Dx.T @ M @ Dx
-        tmp2 = Dy.T @ M @ Dy
-        tmp = tmp1 + tmp2
+        tmp1 = Dx.T @ mij @ Dx
+        tmp2 = Dy.T @ mij @ Dy
+        kij = tmp1 + tmp2
 
-        kij = J.T[n]*tmp  # same as np.diag(J[:, n]) @ tmp
+        # kij = np.diag(J[:, n]) @ tmp  # same as np.diag(J[:, n]) @ tmp
 
-        mij = (np.diag(J[:, n]) @ M)
+        # print(np.linalg.det(np.diag(J[:, n])))
+        print("Mass matrix check", np.array(mij).sum())
+
+        print("Diff control:")
+        print(max(np.cos(x[:, n]) - Dx @ np.sin(x[:, n])))
+        print(max(np.cos(y[:, n]) - Dy @ np.sin(y[:, n])))
+        # print(mij)
         for j in range(Mp):
             # Coordinates of local idx j in N- different from algo due to x/y data structure
             # Could pass xv and yv and use jj as index.
@@ -45,10 +53,15 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
                 # print(ii)
                 f = -q(xj, yj)
                 B[ii] += mij[i, j] * f
-    return A, B
+    print(n)
+    return A, B, Dx, Dy
 
 
 def impose_dirichlet_bc(BoundaryNodesidx, A, B, f, xv, yv, boundary_f):
+    elemsx = 50
+    elemsy = 50
+    print("Amount of boundary nodes:", len(BoundaryNodesidx))
+    print("Expected amount:", elemsx)
     for bn in BoundaryNodesidx:
         xn = xv[bn]
         yn = yv[bn]
@@ -84,9 +97,9 @@ def geometric_factors(x, y, Dr, Ds):
 
 
 if __name__ == "__main__":
-    elemsx = 40
-    elemsy = 40
-    P = 1
+    elemsx = 20
+    elemsy = 20
+    P = 5
     N = elemsx*elemsy*2
     EToV = gen_EToV(elemsx, elemsy)
     EToE = ti_connect2D(elemsx, elemsy)
@@ -102,7 +115,7 @@ if __name__ == "__main__":
     r, s = xytors(x, y)
 
     # Global corner node coordinates
-    vx, vy = gen_node_coordinates(elemsx, elemsy, -1, 1, -2, 2)
+    vx, vy = gen_node_coordinates(elemsx, elemsy, -2, 2, -2, 2)
 
     # Map local into global coordinates
     v1 = EToV[:, 0]
@@ -149,14 +162,41 @@ if __name__ == "__main__":
     xv, yv = convert_coords_to_vec(C, Ne, x.T, y.T)
 
     # Global assembly params
-    def q(x, y): return -5*np.pi**2*np.sin(2*np.pi*x)*np.sin(np.pi*y)  # Dummy q
+    def q(x, y): return -5*np.pi**2*np.sin(np.pi*x)*np.sin(2*np.pi*y)  # Dummy q
     def test_bc(x, y): return 0
 
-    A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
+    A, B, Dx, Dy = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
 
     b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P, C)
+    for node in b_nodes:
+        # xv[node], yv[node]
+        print(f"Boundary node {node}: ({xv[node]}, {yv[node]})")
     A, B = impose_dirichlet_bc(b_nodes, A, B, q, xv, yv, test_bc)
 
+    # print(Dx)
+    # print(Dr)
+    # print(Dy)
+    # print(Ds)
+
+    # print(np.cos(x[:, ]))
+    # print(Dx @ np.sin(x[:, 1]))
+    print("Diff control:")
+    print(max(np.cos(x[:, N-1]) - Dx @ np.sin(x[:, N-1])))
+    print(max(np.cos(y[:, N-1]) - Dy @ np.sin(y[:, N-1])))
+    print(x[:, N-1])
+    print(y[:, N-1])    
+    print(C[N-1, :])
+
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
+    dummy = np.arange(Mp)
+    #print(dummy)
+    print(Mp)
+    ax.scatter(x[:, 1], y[:, 1], dummy, c='r', marker='o')
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+    # plt.show()
     # print("Global matrix A:\n", A)
     # print("Global vector B:\n", B)
 

@@ -108,7 +108,7 @@ def boundary_nodes_from_grid(elemsx, elemsy, P, C):
     idx = 0
     num_bnodes = (2*(elemsy + 1) + 2*(elemsx - 1)) + (P-1) * \
         (2*(elemsx + elemsy))  # First order nodes + higher order nodes
-    print(num_bnodes)
+    # print(num_bnodes)
     boundary_nodes = np.zeros([num_bnodes], dtype=int)
 
     # Add 1st order nodes first:
@@ -127,9 +127,7 @@ def boundary_nodes_from_grid(elemsx, elemsy, P, C):
     # For x-axis: fid 1.
     if P > 1:
         left_boundary_id = range(1, elemsy*2, 2)
-        right_boundary_id = range(
-            2*elemsx*elemsy - elemsy*2, 2*elemsx*elemsy, 2)
-
+        right_boundary_id = range(2*elemsx*elemsy - elemsy*2, 2*elemsx*elemsy, 2)
         top_boundary_id = range(0, 2*elemsx*elemsy - elemsy*2 + 1, 2*elemsy)
         bottom_boundary_id = range(elemsy*2 - 1, 2*elemsx*elemsy, 2*elemsy)
 
@@ -140,18 +138,18 @@ def boundary_nodes_from_grid(elemsx, elemsy, P, C):
 
         for eid in left_boundary_id:
             for p in range(1, P):
-                boundary_nodes[idx] = C[eid, 2 + p]
+                boundary_nodes[idx] = C[eid, 2 + 2*(P-1)+ p]
                 idx += 1
         for eid in right_boundary_id:
             for p in range(1, P):
-                boundary_nodes[idx] = C[eid, 2 + p]
+                boundary_nodes[idx] = C[eid, 2 + 2*(P-1) + p]
                 idx += 1
         for eid in top_boundary_id:
             for p in range(1, P):
-                boundary_nodes[idx] = C[eid, 2 + 2*(P-1) + p]
+                boundary_nodes[idx] = C[eid, 2 + 0*(P-1) + p]
                 idx += 1
         for eid in bottom_boundary_id:
             for p in range(1, P):
-                boundary_nodes[idx] = C[eid, 2 + 2*(P-1) + p]
+                boundary_nodes[idx] = C[eid, 2 + 0*(P-1) + p]
                 idx += 1
     return boundary_nodes
