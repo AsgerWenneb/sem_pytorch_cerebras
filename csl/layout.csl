@@ -17,31 +17,37 @@ const memcpy = @import_module("<memcpy/get_params>", .{
     .height = N_kernel
 });
 
-const send_color: color = @get_color(0);
+const color_a: color = @get_color(0);
+const color_b: color = @get_color(1);
 
 layout {
     // PE coordinates are (column, row)
     @set_rectangle(M_kernel, N_kernel);
 
-    @set_tile_code(0, 0, "pe_program.csl", 
-        .{
-            .memcpy_params = memcpy.get_params(0), 
-      	    .N_per_PE = N_per_PE,
-      	    .NZ_per_N = max_nz_per_n,
-			.pe_id = 0,
-			.send_color = send_color
-        });
-	@set_color_config(0, 0, send_color, .{.routes = .{ .rx = .{RAMP}, .tx = .{EAST} }});
+	for (@range(u16, N_kernel)) |pe_y| {
+		for (@range(u16, M_kernel)) |pe_x| {
+			var send_color: color = color_a;
+			var recv_color: color = color_b;
 
-    @set_tile_code(1, 0, "pe_program.csl", 
-        .{
-            .memcpy_params = memcpy.get_params(1), 
-      	    .N_per_PE = N_per_PE,
-      	    .NZ_per_N = max_nz_per_n,
-			.pe_id = 1,
-			.send_color = send_color
-        });
-	@set_color_config(1, 0, send_color, .{.routes = .{ .rx = .{WEST}, .tx = .{RAMP} }});
+			if (pe_x % 2 == 1) {
+				send_color = color_b;
+				recv_color = color_a;
+			}
+
+			@set_tile_code(pe_x, pe_y, "pe_program.csl", 
+				.{
+					.memcpy_params = memcpy.get_params(pe_x),
+					.N_per_PE = N_per_PE,
+					.NZ_per_N = max_nz_per_n,
+					.M_kernel = M_kernel,
+					.send_color = send_color,
+					.recv_color = recv_color
+				});
+
+			@set_color_config(pe_x, pe_y, send_color, .{.routes = .{ .rx = .{RAMP}, .tx = .{EAST} }});
+			@set_color_config(pe_x, pe_y, recv_color, .{.routes = .{ .rx = .{WEST}, .tx = .{RAMP} }});
+		}
+	}
 
     // export symbol names
     @export_name("NZ", [*]u32, true);

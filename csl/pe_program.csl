@@ -2,21 +2,29 @@
 param memcpy_params: comptime_struct;
 param N_per_PE: u16;
 param NZ_per_N: u16;
-
-// ID of PE (0 is left, 1 is right)
-param pe_id: i16;
+param M_kernel: u16;
 
 // Colors
 param send_color: color; // Color used to send/recv data between PEs
+param recv_color: color; // Color used to send/recv data between PEs
 
 // Queue IDs
 const send_color_oq = @get_output_queue(2);
-const send_color_iq = @get_input_queue(2);
+const recv_color_iq = @get_input_queue(2);
 
 const exit_task_id: local_task_id = @get_local_task_id(9);
 
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
+const layout_mod = @import_module("<layout>");
 const sparse = @import_module("sparse.csl");
+
+fn is_left_col() bool {
+  return (layout_mod.get_x_coord() == 0);
+}
+
+fn is_right_col() bool {
+  return (layout_mod.get_x_coord() == M_kernel-1);
+}
 
 // 48 kB of global memory contain A, x, b, y
 var NZ: [1]u32;
@@ -52,10 +60,25 @@ fn send_right() void {
     @fmovs(out_dsd, y_dsd, .{ .async = true, .activate = exit_task_id });
 }
 
+fn add_send_right() void {
+    const in_dsd = @get_dsd(fabin_dsd, .{
+                   .fabric_color = recv_color, .extent = N_per_PE,
+                   .input_queue = recv_color_iq
+                 });
+
+    const out_dsd = @get_dsd(fabout_dsd, .{
+                      .fabric_color = send_color, .extent = N_per_PE,
+                      .output_queue = send_color_oq
+                    });
+
+    // After fmovs is done, activate exit_task to unblock cmd_stream
+    @fadds(out_dsd, y_dsd, in_dsd, .{ .async = true, .activate = exit_task_id });
+}
+
 fn recv_left() void {
     const in_dsd = @get_dsd(fabin_dsd, .{
-                   .fabric_color = send_color, .extent = N_per_PE,
-                   .input_queue = send_color_iq
+                   .fabric_color = recv_color, .extent = N_per_PE,
+                   .input_queue = recv_color_iq
                  });
 
     // After fadds is done, activate exit_task to unblock cmd stream
@@ -64,12 +87,16 @@ fn recv_left() void {
 
 fn compute() void {
 	gemv();
-	if (pe_id == 0) {
+
+	if (is_left_col()) {
 		send_right();
-	} else {
+	} else if (is_right_col()) {
 		recv_left();
+	} else {
+		add_send_right();
 	}
-	sys_mod.unblock_cmd_stream();
+
+	// sys_mod.unblock_cmd_stream();
 }
 
 task exit_task() void {
@@ -81,7 +108,7 @@ comptime {
 
     if (@is_arch("wse3")) {
       @initialize_queue(send_color_oq, .{ .color = send_color });
-      @initialize_queue(send_color_iq, .{ .color = send_color });
+      @initialize_queue(recv_color_iq, .{ .color = recv_color });
     }
 
     // Export symbol pointing to y so it is host-readable

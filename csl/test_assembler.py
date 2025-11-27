@@ -86,7 +86,7 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
     (_, sp_matrix) = random_triplet_sparse(N_matrix, M_matrix, nz_per_row)
     print("Full matrix")
     print(sp_matrix.toarray())
-    print(sp_matrix)
+    # print(sp_matrix)
     submatrices = split_sparse_matrix(sp_matrix, N_kernel, M_kernel)
 
     # Print submatrices shapes
@@ -98,22 +98,27 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
     nz = np.array([], dtype=np.uint32)
     nz_total = 0
 
+    x = np.full(shape=M_matrix, fill_value=1.0, dtype=np.float32)
+    y = np.full(shape=N_matrix, fill_value=2.5, dtype=np.float32)
+
     for i in range(N_kernel):
         for j in range(M_kernel):
             matrix = submatrices[i][j]
-            print(f"matrix ({i}, {j})")
-            print(matrix.toarray())
-            print()
+            # print(f"matrix ({i}, {j})")
+            # print(matrix.toarray())
+            # print()
             triplets = csr_to_triplet(matrix)
-            print(triplets)
-            print()
+            # print(triplets)
+            # print()
+            expected_part_result = matrix*x[i*N_kernel:(i+1)*N_kernel]
+            if j == 0:
+                expected_part_result += y[i*N_kernel:(i+1)*N_kernel]
+
+            print(f"expected y={expected_part_result} for ({j},{i})")
             nz_sub = len(triplets)
             nz_total += nz_sub
             nz = np.append(nz, np.array(nz_sub, dtype=np.uint32))
             all_triplets = np.append(all_triplets, triplets)
-
-    x = np.full(shape=M_matrix, fill_value=1.0, dtype=np.float32)
-    y = np.full(shape=N_matrix, fill_value=2.5, dtype=np.float32)
 
     y_expected = y + sp_matrix*x
 
@@ -129,9 +134,9 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
 
 if __name__ == "__main__":
     (triplet_stream, nz, x, y, y_expected) = test_assembly(2, 1, 2, 4, 2)
-    print(triplet_stream)
-    print(triplet_stream.size)
-    print(nz)
-    print(x)
-    print(y)
-    print(y_expected)
+    # print(triplet_stream)
+    # print(triplet_stream.size)
+    # print(nz)
+    # print(x)
+    # print(y)
+    # print(y_expected)
