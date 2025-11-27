@@ -8,7 +8,6 @@ from connection_tables import algo14, gen_EToV, ti_connect2D, convert_coords_to_
 from vandermonde import Vandermonde2D, GradVandermonde2D
 from data_export import export_etov, export_data_header, export_solution
 
-import matplotlib.pyplot as plt
 
 def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
     Mp = int((P+1)*(P+2)/2)
