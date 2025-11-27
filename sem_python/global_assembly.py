@@ -1,6 +1,8 @@
 # Methods for grid generation and connection tables.
 # Assumes standard triangular grid.
 import numpy as np
+from scipy import sparse
+
 from global_nodes import gen_node_coordinates
 from local_nodes import Nodes2D
 from coordinate_maps import xytors
@@ -12,7 +14,13 @@ from data_export import export_etov, export_data_header, export_solution
 def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
     Mp = int((P+1)*(P+2)/2)
     print("Global assembly called with Ne (unique nodes) =", Ne, "and N (elements) =", N)
-    A = np.zeros((Ne, Ne))
+
+    n_triplets = N * Mp * Mp
+    row_idx = np.zeros(n_triplets, dtype=int)
+    col_idx = np.zeros(n_triplets, dtype=int)
+    data_vals = np.zeros(n_triplets, dtype=float)
+
+    # A = np.zeros((Ne, Ne))
     B = np.zeros(Ne,)
 
     rx, sx, ry, sy, J = geometric_factors(x, y, Dr, Ds)
@@ -37,11 +45,17 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
 
             for i in range(Mp):
                 # if C[n,j] >= C[n,i]: ## Results in symmetric assembly
-                A[C[n, i], C[n, j]] += kij[i, j]
+                # A[C[n, i], C[n, j]] += kij[i, j]
+                # Store triplet data
+                idx = n * Mp * Mp + j * Mp + i
+                row_idx[idx] = C[n, i]
+                col_idx[idx] = C[n, j]
+                data_vals[idx] = kij[i, j]
 
                 ii = C[n, i]
                 f = -q(xj, yj)
                 B[ii] += mij[i, j] * f
+    A = sparse.coo_matrix((data_vals, (row_idx, col_idx)), shape=(Ne, Ne))
     return A, B
 
 
@@ -49,15 +63,26 @@ def impose_dirichlet_bc(BoundaryNodesidx, A, B, f, xv, yv, boundary_f):
     for bn in BoundaryNodesidx:
         xn = xv[bn]
         yn = yv[bn]
-        B += -f(xn, yn)*A[:, bn]
-        A[bn, :] = 0
-        A[:, bn] = 0
+        fr = A.getrow(bn)
+        # print(fr)
+        B += -f(xn, yn)*fr.toarray().flatten()
+        
+        
+        A.data[A.indptr[bn]:A.indptr[bn+1]] = 0
+
+        # Full matrix alternative:
+        # A[bn, :] = 0
+        # A[:, bn] = 0
+        # A[bn, bn] = 1
+    A = A.tocsc()
+    for bn in BoundaryNodesidx:
+        A.data[A.indptr[bn]:A.indptr[bn+1]] = 0
         A[bn, bn] = 1
     for bn in BoundaryNodesidx:
         xn = xv[bn]
         yn = yv[bn]
         B[bn] = boundary_f(xn, yn)
-    return A, B
+    return A.tocsr(), B
 
 
 def Dmatrices2D(N, r, s, V):
@@ -82,8 +107,8 @@ def geometric_factors(x, y, Dr, Ds):
 
 if __name__ == "__main__":
     # Constants:
-    elemsx = 20
-    elemsy = 20
+    elemsx = 50
+    elemsy = 50
     P = 5
     Mpf = P + 1
     Nfaces = 3
@@ -141,6 +166,7 @@ if __name__ == "__main__":
 
     # Global assembly
     A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
+    A = A.tocsr()
 
     # Impose BCs
     b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P, C)
@@ -150,7 +176,7 @@ if __name__ == "__main__":
     # Solve system
     print("Size of A:", A.shape)
     print("Size of B:", B.shape)
-    sol = np.linalg.solve(A, B)
+    sol = sparse.linalg.spsolve(A, B)
 
     print("Solution max value:", np.max(sol))
     print("Solution min value:", np.min(sol))
