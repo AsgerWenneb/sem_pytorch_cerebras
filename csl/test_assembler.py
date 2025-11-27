@@ -110,9 +110,9 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
             triplets = csr_to_triplet(matrix)
             # print(triplets)
             # print()
-            expected_part_result = matrix*x[i*N_kernel:(i+1)*N_kernel]
+            expected_part_result = matrix*x[j*(M_matrix // M_kernel):(j+1)*(M_matrix // M_kernel)]
             if j == 0:
-                expected_part_result += y[i*N_kernel:(i+1)*N_kernel]
+                expected_part_result += y[i*(N_matrix // N_kernel):(i+1)*(N_matrix // N_kernel)]
 
             print(f"expected y={expected_part_result} for ({j},{i})")
             nz_sub = len(triplets)
@@ -135,8 +135,8 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
 if __name__ == "__main__":
     (triplet_stream, nz, x, y, y_expected) = test_assembly(2, 1, 2, 4, 2)
     # print(triplet_stream)
-    # print(triplet_stream.size)
-    # print(nz)
+    print(f"Stream size: {triplet_stream.size}")
+    print(f"nz: {nz}")
     # print(x)
     # print(y)
     # print(y_expected)
