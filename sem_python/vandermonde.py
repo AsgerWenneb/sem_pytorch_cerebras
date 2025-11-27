@@ -12,14 +12,13 @@ def Vandermonde2D(N, r, s):
     for i in range(N+1):
         for j in range(N - i + 1):
             temp = Simplex2DP(a, b, i, j).T
-            # Verify that this is ok
             temp.shape = V[:, sk].shape
             V[:, sk] = temp
             sk += 1
     return V
 
 
-def GradVandermonde2D(N, r, s):  # Need to fix indexing 0-index - potentially already fixed
+def GradVandermonde2D(N, r, s): 
     Mp = int((N+1)*(N+2)/2)
     V2Dr = np.zeros((len(r), Mp))
     V2Ds = np.zeros((len(r), Mp))

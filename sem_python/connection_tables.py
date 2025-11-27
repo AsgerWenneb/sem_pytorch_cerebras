@@ -22,7 +22,6 @@ def ti_connect2D(elemsx, elemsy):  # EToF is trivial, so not returned
 
     for i in range(elemsx):
         for j in range(elemsy):
-
             idx = (j*2) + (i*elemsy*2)  # (coloumn id) + (row offset)
 
             # EToE
@@ -47,25 +46,20 @@ def ti_connect2D(elemsx, elemsy):  # EToF is trivial, so not returned
 
 
 def algo14(P, N, EToV, EToE, elemsx, elemsy):
-    # For starters implemented as in book
-
+    # Implemented as in FEM book
     gidx = (elemsx + 1)*(elemsy + 1)
     Mp = int((P+1)*(P+2)/2)
     Mpf = P + 1
     Nfaces = 3
-
     C = np.zeros((N, Mp))
 
     for n in range(N):
         for i in range(Nfaces):
             # Assign lowest global index to vertex points.
             C[n, i] = EToV[n, i]
-
             if P > 1:
                 if EToE[n, i] >= n:  # if neighbor has higher index than current index
-
                     # Assign global index to points on face:
-                    # range() should fix conversion to 0 index
                     list_of_idx = [
                         Nfaces + (i)*(Mpf-2) + j for j in range(Mpf-2)]
                     C[n, list_of_idx] = [gidx + k for k in range(Mpf - 2)]
@@ -92,7 +86,6 @@ def algo14(P, N, EToV, EToE, elemsx, elemsy):
 
 # Quite inefficient, double work for corner and edge nodes
 def convert_coords_to_vec(C, Ne, x, y):
-    # print("Called with Ne =", Ne, "and C shape", C.shape, "x shape", x.shape, "y shape", y.shape)
     xv = np.zeros(Ne, )
     yv = np.zeros(Ne, )
 
@@ -108,7 +101,6 @@ def boundary_nodes_from_grid(elemsx, elemsy, P, C):
     idx = 0
     num_bnodes = (2*(elemsy + 1) + 2*(elemsx - 1)) + (P-1) * \
         (2*(elemsx + elemsy))  # First order nodes + higher order nodes
-    # print(num_bnodes)
     boundary_nodes = np.zeros([num_bnodes], dtype=int)
 
     # Add 1st order nodes first:
@@ -123,18 +115,11 @@ def boundary_nodes_from_grid(elemsx, elemsy, P, C):
 
     # Higher order nodes:
     # Will be located at index 3:(P-1) in C, or offset depending on face id
-    # For y-axis: fid 3.
-    # For x-axis: fid 1.
     if P > 1:
         left_boundary_id = range(1, elemsy*2, 2)
         right_boundary_id = range(2*elemsx*elemsy - elemsy*2, 2*elemsx*elemsy, 2)
         top_boundary_id = range(0, 2*elemsx*elemsy - elemsy*2 + 1, 2*elemsy)
         bottom_boundary_id = range(elemsy*2 - 1, 2*elemsx*elemsy, 2*elemsy)
-
-        # print("Left boundary element IDs:", list(left_boundary_id))
-        # print("Right boundary element IDs:", list(right_boundary_id))
-        # print("Top boundary element IDs:", list(top_boundary_id))
-        # print("Bottom boundary element IDs:", list(bottom_boundary_id))
 
         for eid in left_boundary_id:
             for p in range(1, P):

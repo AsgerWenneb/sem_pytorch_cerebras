@@ -17,7 +17,7 @@ def Warpfactor(N, rout, Tol=1e-10):
     Lmat = np.linalg.solve(Veq.T, Pmat)
 
     warp = Lmat.T @ (LGLr - req)
-    zerof = (abs(rout) < Tol)  # Boolean array ? does it work?
+    zerof = (abs(rout) < Tol)
     sf = 1.0 - (zerof*rout)**2
     warp = warp/sf + warp * (zerof - 1)
     return warp
