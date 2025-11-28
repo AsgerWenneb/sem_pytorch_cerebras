@@ -29,7 +29,7 @@ M_kernel = int(compile_data['params']['M_kernel'])
 num_kernels = N_kernel * M_kernel
 
 N_matrix = N_per_PE * N_kernel
-M_matrix = 4*M_kernel
+M_matrix = 2*M_kernel
 nz_per_row = max_nz_per_n
 
 assert N_matrix % N_kernel == 0
@@ -98,21 +98,21 @@ runner.memcpy_h2d(y_symbol, y, 0, 0, 1, N_kernel, N_matrix // N_kernel,
 runner.launch('compute', nonblock=False)
 
 # Restreive y from each PE
-# for pe_y in range(N_kernel):
-#     for pe_x in range(M_kernel):
-#         y_partial_result = np.zeros(N_matrix // N_kernel, dtype=np.float32)
-#         runner.memcpy_d2h(y_partial_result, y_symbol, pe_x, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
-#                           order=MemcpyOrder.ROW_MAJOR,
-#                           data_type=MemcpyDataType.MEMCPY_32BIT,
-#                           nonblock=False)
-#         print(f"y ({pe_x},{pe_y}) = {y_partial_result}")
+for pe_y in range(N_kernel):
+    for pe_x in range(M_kernel):
+        y_partial_result = np.zeros(N_matrix // N_kernel, dtype=np.float32)
+        runner.memcpy_d2h(y_partial_result, y_symbol, pe_x, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
+                          order=MemcpyOrder.ROW_MAJOR,
+                          data_type=MemcpyDataType.MEMCPY_32BIT,
+                          nonblock=False)
+        print(f"y ({pe_x},{pe_y}) = {y_partial_result}")
 
 # Copy y back from device
 y_result = np.zeros(N_matrix, dtype=np.float32)
 for pe_y in range(N_kernel):
     print(f"Retrieving y {pe_y}")
     y_partial_result = y_result[pe_y * (N_matrix // N_kernel):(pe_y+1) * (N_matrix // N_kernel)]
-    runner.memcpy_d2h(y_partial_result, y_symbol, M_kernel-1, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
+    runner.memcpy_d2h(y_partial_result, y_symbol, pe_y, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
                       order=MemcpyOrder.ROW_MAJOR,
                       data_type=MemcpyDataType.MEMCPY_32BIT,
                       nonblock=False)
