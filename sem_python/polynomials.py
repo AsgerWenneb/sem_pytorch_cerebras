@@ -2,13 +2,8 @@ import numpy as np
 from math import gamma
 
 
-def JacobiP(x, alpha, beta, N):  # Passed comparison to matlab
-    xp = x  # Transformation to right dim
-    dims = xp.shape  # Size(xp)
-    # This line fixes the shape issue, but breaks the rest
-    xp.shape = (dims[0],)
-    # if dims[0] == 1: xp = xp.T
-
+def JacobiP(x, alpha, beta, N):  
+    xp = x  # Transformation to right dim - trivial in python.
     PL = np.zeros((N+1, len(xp)))
 
     gamma0 = 2**(alpha + beta + 1)/(alpha + beta + 1) * \
@@ -36,7 +31,6 @@ def JacobiP(x, alpha, beta, N):  # Passed comparison to matlab
 
 
 def GradJacobiP(x, alpha, beta, N):
-    # Derivative of Jacobi polynomial
     dp = np.zeros((len(x),))
     if N == 0:
         return dp
@@ -46,8 +40,7 @@ def GradJacobiP(x, alpha, beta, N):
     return dp
 
 
-def JacobiGQ(alpha, beta, N):  # Tested against matlab for 1,1,2
-    # print("JacobiGQ called with N =", N, "alpha =", alpha, "beta =", beta)
+def JacobiGQ(alpha, beta, N):  
     x = np.zeros((N + 1,))
     w = np.zeros((N + 1,))
     if N == 0:
@@ -62,7 +55,7 @@ def JacobiGQ(alpha, beta, N):  # Tested against matlab for 1,1,2
         np.diag(2/(h1[0:N] + 2) * np.sqrt(np.arange(1, N + 1)*(np.arange(1, N + 1) + alpha + beta) *
                                           (np.arange(1, N + 1) + alpha)*(np.arange(1, N + 1) + beta)/(h1[0:N] + 1)/(h1[0:N] + 3)), 1)
     J = J + J.T
-    print(J)
+    
     # D should be the diagonal matrix of eigenvalues (it is not in python, only matlab), V the eigenvectors
     D, V = np.linalg.eig(J)
     x = D  # Kept this way to reflect original matlab code
