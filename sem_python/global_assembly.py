@@ -42,6 +42,7 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
             # Coordinates of local idx j in N- different from algo due to x/y data structure
             xj = x[j, n]
             yj = y[j, n]
+            f = -q(xj, yj)
 
             for i in range(Mp):
                 # if C[n,j] >= C[n,i]: ## Results in symmetric assembly
@@ -53,7 +54,6 @@ def global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds):  # combined algo 15 and 16
                 data_vals[idx] = kij[i, j]
 
                 ii = C[n, i]
-                f = -q(xj, yj)
                 B[ii] += mij[i, j] * f
     A = sparse.coo_matrix((data_vals, (row_idx, col_idx)), shape=(Ne, Ne))
     return A, B
@@ -103,6 +103,65 @@ def geometric_factors(x, y, Dr, Ds):
     ry = -xs/J
     sy = xr/J
     return rx, sx, ry, sy, J
+
+
+def global_assembly_poisson(elemsx, elemsy, P, q, bc):
+    Mpf = P + 1
+    Mp = int((P+1)*(P+2)/2)
+    N = elemsx*elemsy*2
+
+    # Connection tables
+    EToV = gen_EToV(elemsx, elemsy)
+    EToE = ti_connect2D(elemsx, elemsy)
+    C, Ne = algo14(P, N, EToV, EToE, elemsx, elemsy)
+
+    # Local coords
+    x, y = Nodes2D(P)
+    r, s = xytors(x, y)
+
+    # Global corner node coordinates
+    vx, vy = gen_node_coordinates(elemsx, elemsy, -2, 2, -2, 2)
+
+    # Map local into global coordinates
+    v1 = EToV[:, 0]
+    v2 = EToV[:, 1]
+    v3 = EToV[:, 2]
+    x = 0.5*(np.outer(-(r+s), vx[v1]) + np.outer((1 + r),
+             vx[v2]) + np.outer((1 + s), vx[v3]))
+    y = 0.5*(np.outer(-(r+s), vy[v1]) + np.outer((1 + r),
+             vy[v2]) + np.outer((1 + s), vy[v3]))
+
+    # Reordering of nodes:
+    tol = 0.2/P**2
+    # % Faces
+    fid1 = np.nonzero(abs(s + 1) < tol)[0]
+    fid2 = np.nonzero(abs(r+s) < tol)[0]
+    fid3 = np.nonzero(abs(r + 1) < tol)[0]
+
+    # % Interior
+    fint = np.setdiff1d(np.arange(0, Mp), np.concatenate([fid1, fid2, fid3]))
+    Local_reorder = np.concatenate([np.array([0]), np.array(
+        [Mpf - 1]), np.array([Mp - 1]), fid1[1:Mpf-1], fid2[1:Mpf-1], np.flip(fid3[1:Mpf-1]), fint])
+
+    # Use the reordering:
+    x = x[Local_reorder, :]
+    y = y[Local_reorder, :]
+    r = r[Local_reorder]
+    s = s[Local_reorder]
+
+    # Vandermonde and D matrices
+    V = Vandermonde2D(P, r, s)
+    Dr, Ds = Dmatrices2D(P, r, s, V)
+
+    # Global assembly
+    A, B = global_assembly(C, N, Ne, P, x, y, q, V, Dr, Ds)
+    A = A.tocsr()
+
+    # Impose BCs
+    b_nodes = boundary_nodes_from_grid(elemsx, elemsy, P, C)
+    xv, yv = convert_coords_to_vec(C, Ne, x.T, y.T)
+    A, B = impose_dirichlet_bc(b_nodes, A, B, q, xv, yv, bc)
+    return A, B, C, xv, yv
 
 
 if __name__ == "__main__":
