@@ -13,8 +13,6 @@ def estimate_error(sol, exact_sol):
     return L2_error
 
 
-
-
 if __name__ == "__main__":
     # Define source term and boundary condition functions
     def q(x, y): 
@@ -39,18 +37,6 @@ if __name__ == "__main__":
         err = estimate_error(sol, exact_solution(xv, yv))
         errors.append(err)
 
-    # Ps = list(P_range)
-    # plt.figure(figsize=(6,4))
-    # plt.scatter(Ps, errors, c='C0')
-    # plt.plot(Ps, errors, c='C0', alpha=0.6)
-    # plt.xlabel('Polynomial degree P')
-    # plt.ylabel('L2 error')
-    # plt.yscale('log')
-    # plt.title('L2 error vs P (5x5 grid)')
-    # plt.grid(True, linestyle='--', alpha=0.4)
-    # plt.tight_layout()
-    # plt.savefig('errors_vs_P.png', dpi=150)
-    # plt.show()
     fig, ax = plt.subplots(figsize=(6,4))
     ax.scatter(P_range, errors, c='C1')
     ax.plot(P_range, errors, c='C1', alpha=0.6)
@@ -58,11 +44,8 @@ if __name__ == "__main__":
     ax.set_ylabel('Nodal L2 error')
     ax.set_yscale('log')
     ax.set_title('Nodal L2 error vs P (5x5 grid)')
-
-    # Major ticks as exponential (10^n) and minor subticks visible on y-axis
     ax.yaxis.set_major_formatter(mticker.LogFormatterMathtext(base=10.0))
     ax.yaxis.set_major_locator(mticker.LogLocator(base=10.0))
-    # show subticks (minor ticks) between decades
     ax.yaxis.set_minor_locator(mticker.LogLocator(base=10.0, subs=np.arange(2, 10), numticks=50))
     ax.grid(which='major', axis='y', linestyle='--', alpha=0.9)
     ax.grid(which='major', axis='x', linestyle='--', alpha=0.9)
@@ -71,8 +54,6 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig('errors_vs_P.png', dpi=150)
     plt.show()
-
-
 
 
     P = 1
@@ -105,10 +86,6 @@ if __name__ == "__main__":
     plt.savefig('errors_vs_elements.png', dpi=150)
     plt.show()
 
-
-    # print("Solution max value:", np.max(sol))
-    # print("Solution min value:", np.min(sol))
-    # print("L2 Error:", err)
 
     # # Export data
     # n_corner_nodes = (elemsx + 1) * (elemsy + 1)
