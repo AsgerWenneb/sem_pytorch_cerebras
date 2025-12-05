@@ -99,17 +99,18 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
     nz_total = 0
 
     x = np.full(shape=M_matrix, fill_value=1.0, dtype=np.float32)
-    y = np.full(shape=N_matrix, fill_value=2.5, dtype=np.float32)
+    # y = np.full(shape=N_matrix, fill_value=2.5, dtype=np.float32)
+    y = np.full(shape=N_matrix, fill_value=0, dtype=np.float32)
 
     for i in range(N_kernel):
         for j in range(M_kernel):
             matrix = submatrices[i][j]
-            # print(f"matrix ({i}, {j})")
-            # print(matrix.toarray())
-            # print()
+            print(f"matrix ({i}, {j})")
+            print(matrix.toarray())
+            print()
             triplets = csr_to_triplet(matrix)
-            # print(triplets)
-            # print()
+            print(triplets)
+            print()
             expected_part_result = matrix*x[j*(M_matrix // M_kernel):(j+1)*(M_matrix // M_kernel)]
             if j == 0:
                 expected_part_result += y[i*(N_matrix // N_kernel):(i+1)*(N_matrix // N_kernel)]
@@ -120,7 +121,8 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
             nz = np.append(nz, np.array(nz_sub, dtype=np.uint32))
             all_triplets = np.append(all_triplets, triplets)
 
-    y_expected = y + sp_matrix*x
+    x1 = y + sp_matrix*x
+    x2 = y + sp_matrix*x1
 
     # Calculate expected y
     # y_expected = A.reshape(N_per_PE, N_per_PE)@x + y
@@ -129,7 +131,7 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
 
     assert triplet_stream.nbytes == nz_total * 8
 
-    return triplet_stream, nz, x, y, y_expected
+    return triplet_stream, nz, x, y, x2
 
 
 if __name__ == "__main__":

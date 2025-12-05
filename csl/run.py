@@ -29,7 +29,7 @@ M_kernel = int(compile_data['params']['M_kernel'])
 num_kernels = N_kernel * M_kernel
 
 N_matrix = N_per_PE * N_kernel
-M_matrix = 2*M_kernel
+M_matrix = N_per_PE * M_kernel
 nz_per_row = max_nz_per_n
 
 assert N_matrix % N_kernel == 0
@@ -40,6 +40,7 @@ assert M_matrix % M_kernel == 0
 runner = SdkRuntime(args.name, cmaddr=args.cmaddr)
 
 # Get symbols for A, x, b, y on device
+iterations_symbol = runner.get_id('iterations')
 NZ_symbol = runner.get_id('NZ')
 A_symbol = runner.get_id('A')
 x_symbol = runner.get_id('x')
@@ -53,6 +54,14 @@ runner.run()
 
 print(f"Stream size: {triplet_stream.size}")
 print(f"nz: {nz}")
+
+iterations = np.full(shape=(M_kernel*N_kernel), fill_value=2, dtype=np.uint32)
+
+runner.memcpy_h2d(iterations_symbol, iterations, 0, 0, M_kernel, N_kernel, 1,
+                  streaming=False,
+                  order=MemcpyOrder.ROW_MAJOR,
+                  data_type=MemcpyDataType.MEMCPY_32BIT,
+                  nonblock=False)
 
 print("Transfering NZ")
 runner.memcpy_h2d(NZ_symbol, nz, 0, 0, M_kernel, N_kernel, 1,
@@ -101,7 +110,7 @@ runner.launch('compute', nonblock=False)
 for pe_y in range(N_kernel):
     for pe_x in range(M_kernel):
         y_partial_result = np.zeros(N_matrix // N_kernel, dtype=np.float32)
-        runner.memcpy_d2h(y_partial_result, y_symbol, pe_x, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
+        runner.memcpy_d2h(y_partial_result, x_symbol, pe_x, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
                           order=MemcpyOrder.ROW_MAJOR,
                           data_type=MemcpyDataType.MEMCPY_32BIT,
                           nonblock=False)
@@ -112,10 +121,12 @@ y_result = np.zeros(N_matrix, dtype=np.float32)
 for pe_y in range(N_kernel):
     print(f"Retrieving y {pe_y}")
     y_partial_result = y_result[pe_y * (N_matrix // N_kernel):(pe_y+1) * (N_matrix // N_kernel)]
-    runner.memcpy_d2h(y_partial_result, y_symbol, pe_y, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
+
+    runner.memcpy_d2h(y_partial_result, x_symbol, pe_y, pe_y, 1, 1, N_matrix // N_kernel, streaming=False,
                       order=MemcpyOrder.ROW_MAJOR,
                       data_type=MemcpyDataType.MEMCPY_32BIT,
                       nonblock=False)
+
     print(y_partial_result)
     # y_result = np.append(y_result, y_partial_result)
 

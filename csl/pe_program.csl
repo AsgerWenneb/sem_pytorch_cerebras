@@ -13,7 +13,12 @@ const send_1_oq = @get_output_queue(2);
 const recv_1_iq = @get_input_queue(2);
 const recv_2_iq = @get_input_queue(3);
 
+const vert_color = @get_color(2);
+const vert_iq = @get_input_queue(4);
+const vert_oq = @get_output_queue(4);
+
 const exit_task_id: local_task_id = @get_local_task_id(9);
+const propagate_result_id: local_task_id = @get_local_task_id(10);
 
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
 const layout_mod = @import_module("<layout>");
@@ -31,27 +36,36 @@ fn is_diagonal() bool {
   return (layout_mod.get_x_coord() == layout_mod.get_y_coord());
 }
 
-// 48 kB of global memory contain A, x, b, y
+var iterations: [1]u32;
 var NZ: [1]u32;
-var A: [N_per_PE*NZ_per_N]sparse.triplet; // A is stored column major
-var x: [N_per_PE]f32;
-var y: [N_per_PE]f32;
+var A: [N_per_PE*NZ_per_N]sparse.triplet; // R
+var x: [N_per_PE]f32; // u0
+var x2: [N_per_PE]f32; // u1
+var y: [N_per_PE]f32; // g
 
 var y_dsd = @get_dsd(mem1d_dsd, .{ .base_address = &y, .extent = N_per_PE });
+var x_dsd = @get_dsd(mem1d_dsd, .{ .base_address = &x, .extent = N_per_PE });
+var x2_dsd = @get_dsd(mem1d_dsd, .{ .base_address = &x2, .extent = N_per_PE });
 
 // ptrs to A, x, b, y will be advertised as symbols to host
+var iterations_ptr: [*]u32 = &iterations;
 var NZ_ptr: [*]u32 = &NZ;
 var A_ptr: [*]sparse.triplet = &A;
 var x_ptr: [*]f32 = &x;
+var x2_ptr: [*]f32 = &x;
 var y_ptr: [*]f32 = &y;
 
 var triplet: sparse.triplet;
 
-fn gemv() void {
+fn spmv() void {
+	for (@range(u16, N_per_PE)) |i| {
+		x2[i] = y[triplet.i];
+	}
+
 	for (@range(u32, NZ[0])) |i| {
 		triplet = A[i];
 
-		y[triplet.i] += triplet.x * x[triplet.j];
+		x2[triplet.i] += triplet.x * x[triplet.j];
 	}
 }
 
@@ -61,8 +75,7 @@ fn send() void {
                       .output_queue = send_1_oq
                     });
 
-    // After fmovs is done, activate exit_task to unblock cmd_stream
-    @fmovs(out_dsd, y_dsd, .{ .async = true, .activate = exit_task_id });
+    // @fmovs(out_dsd, x2_dsd, .{ .async = true, .unblock = propagate_result_id });
 }
 
 fn add_and_send() void {
@@ -76,8 +89,7 @@ fn add_and_send() void {
                       .output_queue = send_1_oq
                     });
 
-    // After fmovs is done, activate exit_task to unblock cmd_stream
-    @fadds(out_dsd, y_dsd, in_dsd, .{ .async = true, .activate = exit_task_id });
+    @fadds(out_dsd, x2_dsd, in_dsd, .{ .async = true, .unblock = propagate_result_id });
 }
 
 fn recv() void {
@@ -86,16 +98,14 @@ fn recv() void {
 			.input_queue = recv_1_iq
 			});
 
-	// After fadds is done, activate exit_task to unblock cmd stream
-	@fadds(y_dsd, y_dsd, in_a_dsd, .{ .async = false });
+	@fadds(x2_dsd, x2_dsd, in_a_dsd, .{ .async = false });
 
 	const in_b_dsd = @get_dsd(fabin_dsd, .{
 				   .fabric_color = send_recv_color, .extent = N_per_PE,
 				   .input_queue = recv_2_iq
 				 });
 
-	// After fadds is done, activate exit_task to unblock cmd stream
-	@fadds(y_dsd, y_dsd, in_b_dsd, .{ .async = true, .activate = exit_task_id });
+	@fadds(x2_dsd, x2_dsd, in_b_dsd, .{ .async = true, .unblock = propagate_result_id });
 }
 
 fn recv_top_left() void {
@@ -104,8 +114,7 @@ fn recv_top_left() void {
 				   .input_queue = recv_2_iq
 				 });
 
-	// After fadds is done, activate exit_task to unblock cmd stream
-	@fadds(y_dsd, y_dsd, in_dsd, .{ .async = true, .activate = exit_task_id });
+	@fadds(x2_dsd, x2_dsd, in_dsd, .{ .async = true, .unblock = propagate_result_id });
 }
 
 fn recv_bottom_right() void {
@@ -114,12 +123,39 @@ fn recv_bottom_right() void {
 				   .input_queue = recv_1_iq
 				 });
 
-	// After fadds is done, activate exit_task to unblock cmd stream
-	@fadds(y_dsd, y_dsd, in_dsd, .{ .async = true, .activate = exit_task_id });
+	@fadds(x2_dsd, x2_dsd, in_dsd, .{ .async = true, .unblock = propagate_result_id });
 }
 
-fn compute() void {
-	gemv();
+fn send_result() void {
+	const out_dsd = @get_dsd(fabout_dsd, .{
+				   .fabric_color = vert_color, .extent = N_per_PE,
+				   .output_queue = vert_oq
+				 });
+
+    @fmovs(out_dsd, x2_dsd, .{ .async = true });
+}
+
+fn recv_result() void {
+	const in_dsd = @get_dsd(fabin_dsd, .{
+				   .fabric_color = vert_color, .extent = N_per_PE,
+				   .input_queue = vert_iq
+				 });
+
+    @fmovs(x_dsd, in_dsd, .{ .async = false });
+}
+
+task propagate_result() void {
+	if (is_diagonal()) {
+		send_result();
+	}
+
+
+	recv_result();
+	@unblock(exit_task_id);
+}
+
+fn iterate() void {
+	spmv();
 
 	if (is_diagonal()) {
 		if (is_left_col()) {
@@ -134,24 +170,47 @@ fn compute() void {
 	} else  {
 		add_and_send();
 	} 
+}
 
-	// sys_mod.unblock_cmd_stream();
+var num_iteration: u32 = 0;
+fn compute() void {
+	num_iteration = 0;
+    @block(exit_task_id);
+    @activate(exit_task_id);
+
+    @block(propagate_result_id);
+    @activate(propagate_result_id);
+
+	for (@range(u32, iterations[0])) |_| {
+		iterate();
+	}
 }
 
 task exit_task() void {
-	sys_mod.unblock_cmd_stream();
+	@block(propagate_result_id);
+
+	num_iteration += 1;
+
+	if (num_iteration >= iterations[0]) {
+		sys_mod.unblock_cmd_stream();
+	}
 }
 
 comptime {
     @bind_local_task(exit_task, exit_task_id);
+    @bind_local_task(propagate_result, propagate_result_id);
 
     if (@is_arch("wse3")) {
       @initialize_queue(send_1_oq, .{ .color = send_recv_color });
       @initialize_queue(recv_1_iq, .{ .color = recv_color });
       @initialize_queue(recv_2_iq, .{ .color = send_recv_color });
+
+      @initialize_queue(vert_iq, .{ .color = vert_color });
+      @initialize_queue(vert_oq, .{ .color = vert_color });
     }
 
     // Export symbol pointing to y so it is host-readable
+    @export_symbol(iterations_ptr, "iterations");
     @export_symbol(NZ_ptr, "NZ");
     @export_symbol(A_ptr, "A");
     @export_symbol(x_ptr, "x");

@@ -19,6 +19,7 @@ const memcpy = @import_module("<memcpy/get_params>", .{
 
 const color_0: color = @get_color(0);
 const color_1: color = @get_color(1);
+const color_2: color = @get_color(2);
 
 layout {
     // PE coordinates are (column, row)
@@ -56,17 +57,37 @@ layout {
 			if (pe_x == pe_y) { // Diagonal
 				@set_color_config(pe_x, pe_y, color_a, .{.routes = .{ .rx = .{WEST}, .tx = .{RAMP} }});
 				@set_color_config(pe_x, pe_y, color_b, .{.routes = .{ .rx = .{EAST}, .tx = .{RAMP} }});
+				if (pe_y == 0) {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{RAMP}, .tx = .{SOUTH, RAMP}}});
+				} else if (pe_y == N_kernel - 1) {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{RAMP}, .tx = .{NORTH, RAMP}}});
+				} else {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{RAMP}, .tx = .{NORTH, SOUTH, RAMP}}});
+				}
 			} else if (pe_x < pe_y) { // Left of / Below diagonal
 				@set_color_config(pe_x, pe_y, color_a, .{.routes = .{ .rx = .{WEST}, .tx = .{RAMP} }});
 				@set_color_config(pe_x, pe_y, color_b, .{.routes = .{ .rx = .{RAMP}, .tx = .{EAST} }});
+
+				if (pe_y == N_kernel - 1) {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{NORTH}, .tx = .{RAMP}}});
+				} else {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{NORTH}, .tx = .{RAMP, SOUTH}}});
+				}
 			} else { // Right of / above diagonal
 				@set_color_config(pe_x, pe_y, color_a, .{.routes = .{ .rx = .{RAMP}, .tx = .{WEST} }});
 				@set_color_config(pe_x, pe_y, color_b, .{.routes = .{ .rx = .{EAST}, .tx = .{RAMP} }});
+
+				if (pe_y == 0) {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{SOUTH}, .tx = .{RAMP}}});
+				} else {
+					@set_color_config(pe_x, pe_y, color_2, .{.routes = .{ .rx = .{SOUTH}, .tx = .{RAMP, NORTH}}});
+				}
 			}
 		}
 	}
 
     // export symbol names
+    @export_name("iterations", [*]u32, true);
     @export_name("NZ", [*]u32, true);
     @export_name("A", [*]sparse.triplet, true);
     @export_name("x", [*]f32, true);
