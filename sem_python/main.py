@@ -14,7 +14,7 @@ def estimate_error(sol, exact_sol):
 
 
 if __name__ == "__main__":
-    # Define source term and boundary condition functions
+
     def q(x, y): 
         return -5*np.pi**2*np.sin(np.pi*x)*np.sin(2*np.pi*y)  
     
@@ -25,17 +25,16 @@ if __name__ == "__main__":
         return np.sin(np.pi*x)*np.sin(2*np.pi*y)
 
 
-    # Problem parameters
-    elemsx = 5  # Number of elements in x
-    elemsy = 5  # Number of elements in y
+    elemsx = 5  
+    elemsy = 5
     errors = []
     P_range = range(4, 17)
     for P in P_range:
-    # Assemble global system
         A, B, C, xv, yv = global_assembly_poisson(elemsx, elemsy, P, q, bc)
         sol = sparse.linalg.spsolve(A, B)
         err = estimate_error(sol, exact_solution(xv, yv))
         errors.append(err)
+
 
     fig, ax = plt.subplots(figsize=(6,4))
     ax.scatter(P_range, errors, c='C1')
