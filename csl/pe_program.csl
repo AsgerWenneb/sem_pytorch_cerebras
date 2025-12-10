@@ -17,6 +17,7 @@ const exit_task_id: local_task_id = @get_local_task_id(9);
 
 const sys_mod = @import_module("<memcpy/memcpy>", memcpy_params);
 const layout_mod = @import_module("<layout>");
+const timestamp = @import_module("<time>");
 const sparse = @import_module("sparse.csl");
 
 fn is_left_col() bool {
@@ -35,6 +36,7 @@ fn is_diagonal() bool {
 var NZ: [1]u32;
 var A: [N_per_PE*NZ_per_N]sparse.triplet; // A is stored column major
 var x: [N_per_PE]f32;
+var b: [N_per_PE]f32;
 var y: [N_per_PE]f32;
 
 var y_dsd = @get_dsd(mem1d_dsd, .{ .base_address = &y, .extent = N_per_PE });
@@ -43,14 +45,25 @@ var y_dsd = @get_dsd(mem1d_dsd, .{ .base_address = &y, .extent = N_per_PE });
 var NZ_ptr: [*]u32 = &NZ;
 var A_ptr: [*]sparse.triplet = &A;
 var x_ptr: [*]f32 = &x;
+var b_ptr: [*]f32 = &b;
 var y_ptr: [*]f32 = &y;
 
 var triplet: sparse.triplet;
 
+var tscStartBuffer = @zeros([timestamp.tsc_size_words]u16);
+var tscEndBuffer = @zeros([timestamp.tsc_size_words]u16);
+var start_time = @zeros([timestamp.tsc_size_words]u32);
+var end_time = @zeros([timestamp.tsc_size_words]u32);
+var start_time_ptr: [*]u32 = &start_time;
+var end_time_ptr: [*]u32 = &end_time;
+
 fn gemv() void {
+	for (@range(u32, N_per_PE)) |i| {
+		y[i] = b[i];
+	}
+
 	for (@range(u32, NZ[0])) |i| {
 		triplet = A[i];
-
 		y[triplet.i] += triplet.x * x[triplet.j];
 	}
 }
@@ -119,6 +132,9 @@ fn recv_bottom_right() void {
 }
 
 fn compute() void {
+	timestamp.enable_tsc();
+	timestamp.get_timestamp(&tscStartBuffer);
+
 	gemv();
 
 	if (is_diagonal()) {
@@ -135,10 +151,16 @@ fn compute() void {
 		add_and_send();
 	} 
 
-	// sys_mod.unblock_cmd_stream();
 }
 
 task exit_task() void {
+	timestamp.get_timestamp(&tscEndBuffer);
+	start_time[0] = @as(u32, tscStartBuffer[0]);
+	start_time[1] = @as(u32, tscStartBuffer[1]);
+	start_time[2] = @as(u32, tscStartBuffer[2]);
+	end_time[0] = @as(u32, tscEndBuffer[0]);
+	end_time[1] = @as(u32, tscEndBuffer[1]);
+	end_time[2] = @as(u32, tscEndBuffer[2]);
 	sys_mod.unblock_cmd_stream();
 }
 
@@ -155,7 +177,11 @@ comptime {
     @export_symbol(NZ_ptr, "NZ");
     @export_symbol(A_ptr, "A");
     @export_symbol(x_ptr, "x");
+    @export_symbol(b_ptr, "b");
     @export_symbol(y_ptr, "y");
+
+	@export_symbol(start_time_ptr, "start_time");
+	@export_symbol(end_time_ptr, "end_time");
 
     // Export function so it is host-callable by RPC mechanism
     @export_symbol(compute);

@@ -84,15 +84,7 @@ def split_sparse_matrix(mat, num_row_blocks, num_col_blocks):
 
 def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
     (_, sp_matrix) = random_triplet_sparse(N_matrix, M_matrix, nz_per_row)
-    print("Full matrix")
-    print(sp_matrix.toarray())
-    # print(sp_matrix)
     submatrices = split_sparse_matrix(sp_matrix, N_kernel, M_kernel)
-
-    # Print submatrices shapes
-    # for i, row in enumerate(submatrices):
-    #     for j, sub in enumerate(row):
-    #         print(f"Submatrix ({i},{j}) shape: {sub.shape}")
 
     all_triplets = np.array([], dtype=triplet_dtype)
     nz = np.array([], dtype=np.uint32)
@@ -104,17 +96,7 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
     for i in range(N_kernel):
         for j in range(M_kernel):
             matrix = submatrices[i][j]
-            # print(f"matrix ({i}, {j})")
-            # print(matrix.toarray())
-            # print()
             triplets = csr_to_triplet(matrix)
-            # print(triplets)
-            # print()
-            expected_part_result = matrix*x[j*(M_matrix // M_kernel):(j+1)*(M_matrix // M_kernel)]
-            if j == 0:
-                expected_part_result += y[i*(N_matrix // N_kernel):(i+1)*(N_matrix // N_kernel)]
-
-            print(f"expected y={expected_part_result} for ({j},{i})")
             nz_sub = len(triplets)
             nz_total += nz_sub
             nz = np.append(nz, np.array(nz_sub, dtype=np.uint32))
@@ -134,9 +116,3 @@ def test_assembly(N_kernel, M_kernel, N_matrix, M_matrix, nz_per_row):
 
 if __name__ == "__main__":
     (triplet_stream, nz, x, y, y_expected) = test_assembly(2, 1, 2, 4, 2)
-    # print(triplet_stream)
-    print(f"Stream size: {triplet_stream.size}")
-    print(f"nz: {nz}")
-    # print(x)
-    # print(y)
-    # print(y_expected)

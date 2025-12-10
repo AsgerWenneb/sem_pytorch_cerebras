@@ -70,6 +70,9 @@ layout {
     @export_name("NZ", [*]u32, true);
     @export_name("A", [*]sparse.triplet, true);
     @export_name("x", [*]f32, true);
+    @export_name("b", [*]f32, true);
     @export_name("y", [*]f32, true);
+    @export_name("start_time", [*]u32, true);
+    @export_name("end_time", [*]u32, true);
     @export_name("compute", fn()void);
 }
